@@ -1,0 +1,338 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "ECS Autoscale Template - Jenkins Specific (1-Sep-2016)",
+  "Parameters": {
+    "ClusterName": {
+      "Description": "The ECS Cluster Name",
+      "Type": "String"
+    },
+    "SecurityGroup": {
+      "Description": "Enter Security Group",
+      "Type": "String"
+    },
+    "JNLPPORT": {
+      "Description": "Enter Port for JNLP Slaves to connect to",
+      "Type": "String"
+    },
+    "VPC": {
+      "Description": "The VPC for this cluster",
+      "Type": "String"
+    },
+    "ECSSubnetA": {
+      "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+      "Type": "String",
+      "Default": ""
+    },
+    "ECSSubnetB": {
+      "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+      "Type" : "String",
+      "Default": ""
+    },
+    "KeyName": {
+      "Description": "The SSH Key for the cluster nodes",
+      "Type": "String"
+    },
+    "AutoMin": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select minimum instance number for Auto Scaling"
+    },
+    "AutoMax": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select maximum instance number for Auto Scaling"
+    },
+    "AutoDesired": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select desired instance number for Auto Scaling"
+    },
+    "InstanceType": {
+        "Type": "String",
+        "Default": "t2.micro",
+        "AllowedValues": [
+            "t2.micro",
+            "t2.small",
+            "t2.medium",
+            "m3.medium",
+            "m3.large",
+            "m3.xlarge",
+            "m3.2xlarge",
+            "c3.large",
+            "c3.xlarge",
+            "c3.2xlarge",
+            "c3.4xlarge",
+            "c3.8xlarge",
+            "c4.large",
+            "c4.xlarge",
+            "c4.2xlarge",
+            "c4.4xlarge",
+            "c4.8xlarge",
+            "g2.2xlarge",
+            "r3.large",
+            "r3.xlarge",
+            "r3.2xlarge",
+            "r3.4xlarge",
+            "r3.8xlarge",
+            "i2.xlarge",
+            "i2.2xlarge",
+            "i2.4xlarge",
+            "i2.8xlarge",
+            "d2.xlarge",
+            "d2.2xlarge",
+            "d2.4xlarge",
+            "d2.8xlarge",
+            "hi1.4xlarge",
+            "hs1.8xlarge",
+            "cr1.8xlarge",
+            "cc2.8xlarge",
+            "cg1.4xlarge"
+        ],
+        "ConstraintDescription": "must be a valid EC2 instance type."
+    }
+},
+"Metadata" : {
+    "AWS::CloudFormation::Interface" : {
+        "ParameterGroups" : [
+            {
+                "Label" : { "default": "EC2 Config" },
+                "Parameters" : ["InstanceType", "KeyName", "ClusterName"]
+            },
+            {
+                "Label" : { "default": "Autoscale Config" },
+                "Parameters" : ["AutoMin", "AutoMax", "AutoDesired" ]
+            },
+            {
+                "Label" : { "default": "VPC Config" },
+                "Parameters" : ["VPC", "ECSSubnetA", "ECSSubnetB"]
+            },
+            {
+                "Label" : { "default": "Jenkins Config" },
+                "Parameters" : ["JNLPPORT"]
+            }
+        ]
+    }
+},
+"Mappings" : {
+    "AWSInstanceType2Arch" : {
+        "t2.micro"    : { "Arch" : "HVM64"  },
+        "t2.small"    : { "Arch" : "HVM64"  },
+        "t2.medium"   : { "Arch" : "HVM64"  },
+        "t2.large"    : { "Arch" : "HVM64"  },
+        "m1.small"    : { "Arch" : "HVM64"  },
+        "m1.medium"   : { "Arch" : "HVM64"  },
+        "m1.large"    : { "Arch" : "HVM64"  },
+        "m1.xlarge"   : { "Arch" : "HVM64"  },
+        "m2.xlarge"   : { "Arch" : "HVM64"  },
+        "m2.2xlarge"  : { "Arch" : "HVM64"  },
+        "m2.4xlarge"  : { "Arch" : "HVM64"  },
+        "m3.medium"   : { "Arch" : "HVM64"  },
+        "m3.large"    : { "Arch" : "HVM64"  },
+        "m3.xlarge"   : { "Arch" : "HVM64"  },
+        "m3.2xlarge"  : { "Arch" : "HVM64"  },
+        "m4.large"    : { "Arch" : "HVM64"  },
+        "m4.xlarge"   : { "Arch" : "HVM64"  },
+        "m4.2xlarge"  : { "Arch" : "HVM64"  },
+        "m4.4xlarge"  : { "Arch" : "HVM64"  },
+        "m4.10xlarge" : { "Arch" : "HVM64"  },
+        "c1.medium"   : { "Arch" : "HVM64"  },
+        "c1.xlarge"   : { "Arch" : "HVM64"  },
+        "c3.large"    : { "Arch" : "HVM64"  },
+        "c3.xlarge"   : { "Arch" : "HVM64"  },
+        "c3.2xlarge"  : { "Arch" : "HVM64"  },
+        "c3.4xlarge"  : { "Arch" : "HVM64"  },
+        "c3.8xlarge"  : { "Arch" : "HVM64"  },
+        "c4.large"    : { "Arch" : "HVM64"  },
+        "c4.xlarge"   : { "Arch" : "HVM64"  },
+        "c4.2xlarge"  : { "Arch" : "HVM64"  },
+        "c4.4xlarge"  : { "Arch" : "HVM64"  },
+        "c4.8xlarge"  : { "Arch" : "HVM64"  },
+        "g2.2xlarge"  : { "Arch" : "HVM64"  },
+        "g2.8xlarge"  : { "Arch" : "HVM64"  },
+        "r3.large"    : { "Arch" : "HVM64"  },
+        "r3.xlarge"   : { "Arch" : "HVM64"  },
+        "r3.2xlarge"  : { "Arch" : "HVM64"  },
+        "r3.4xlarge"  : { "Arch" : "HVM64"  },
+        "r3.8xlarge"  : { "Arch" : "HVM64"  },
+        "i2.xlarge"   : { "Arch" : "HVM64"  },
+        "i2.2xlarge"  : { "Arch" : "HVM64"  },
+        "i2.4xlarge"  : { "Arch" : "HVM64"  },
+        "i2.8xlarge"  : { "Arch" : "HVM64"  },
+        "d2.xlarge"   : { "Arch" : "HVM64"  },
+        "d2.2xlarge"  : { "Arch" : "HVM64"  },
+        "d2.4xlarge"  : { "Arch" : "HVM64"  },
+        "d2.8xlarge"  : { "Arch" : "HVM64"  },
+        "hi1.4xlarge" : { "Arch" : "HVM64"  },
+        "hs1.8xlarge" : { "Arch" : "HVM64"  },
+        "cr1.8xlarge" : { "Arch" : "HVM64"  },
+        "cc2.8xlarge" : { "Arch" : "HVM64"  }
+    },
+    "AWSRegionArch2AMI": {
+        "us-east-1"       : { "HVM64": "ami-dc6aa9b1" },
+        "us-west-2"       : { "HVM64": "ami-fa76b29a" },
+        "us-west-1"       : { "HVM64": "ami-524b0f32" },
+        "eu-west-1"       : { "HVM64": "ami-e9d9419a" },
+        "eu-central-1"    : { "HVM64": "ami-e626ce89" },
+        "ap-northeast-1"  : { "HVM64": "ami-dd9e4cbe" },
+        "ap-northeast-2"  : { "HVM64": "ami-d4408bba" },
+        "ap-southeast-1"  : { "HVM64": "ami-ad41b5cc" },
+        "ap-southeast-2"  : { "HVM64": "ami-79361e1a" },
+        "sa-east-1"       : { "HVM64": "ami-add144c1" }
+    }
+},
+"Resources": {
+    "ECSAutoScalingGroup" : {
+        "Type" : "AWS::AutoScaling::AutoScalingGroup",
+        "Properties" : {
+            "AvailabilityZones" : { "Fn::GetAZs" : ""},
+            "VPCZoneIdentifier": [ { "Ref" : "ECSSubnetA" },{ "Ref" : "ECSSubnetB" }],
+            "LaunchConfigurationName": { "Ref": "ECSLaunchConfiguration" },
+            "Cooldown": "30",
+            "MinSize" : { "Ref" : "AutoMin" },
+            "MaxSize" : { "Ref" : "AutoMax" },
+            "DesiredCapacity" : { "Ref" : "AutoDesired" },
+            "Tags" : [
+              {
+                "PropagateAtLaunch": "true",
+                "Key": "Name",
+                "Value": { "Fn::Join": [ "-",[ { "Ref": "ClusterName" }, "Node" ] ] }
+              },
+              {
+                "PropagateAtLaunch": "true",
+                "Key": "ECS_Cluster",
+                "Value": { "Ref": "ClusterName" }
+              }
+
+            ]
+        }
+    },
+    "ECSLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "KeyName" : { "Ref" : "KeyName" },
+        "IamInstanceProfile":{ "Ref":"InstanceProfile" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                    { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "AssociatePublicIpAddress" : "true",
+        "InstanceType"   : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ {"Ref" : "SecurityGroup"} ],
+        "AssociatePublicIpAddress": "false",
+        "EbsOptimized": "false",
+        "IamInstanceProfile": {"Ref": "IAMInstanceProfile"},
+        "InstanceMonitoring": "true",
+        "UserData": { "Fn::Base64": { "Fn::Join": [ "", [
+                "#!/bin/bash -v\n",
+                "yum update -y\n",
+                "mkdir -p /etc/ecs\n",
+                "echo 'ECS_CLUSTER=",{ "Ref": "ClusterName" },"' > /etc/ecs/ecs.config\n"
+              ] ] }
+        }
+      }
+    },
+    "IAMRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "ecs",
+                  "nodes",
+                  "role"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecs:CreateCluster",
+                    "ecs:DeregisterContainerInstance",
+                    "ecs:DiscoverPollEndpoint",
+                    "ecs:Poll",
+                    "ecs:RegisterContainerInstance",
+                    "ecs:Submit*",
+                    "elasticloadbalancing:Describe*",
+                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                    "ec2:Describe*",
+                    "ec2:AuthorizeSecurityGroupIngress"
+                  ],
+                  "Resource": [
+                    "*"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "IAMInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "IAMRole"
+          }
+        ]
+      }
+    }
+  }
+}

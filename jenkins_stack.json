@@ -1,0 +1,348 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description": "Jenkins Stack - Linux Master && ECS Build Nodes (1-Sep-2016)",
+  "Parameters": {
+    "KeyName": {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type" : "AWS::EC2::KeyPair::KeyName"
+    },
+    "HostedZone": {
+      "Type": "String",
+      "Default": "domain.com",
+      "Description": "must match a route53 hosted domain/zone"
+    },
+    "Subdomain": {
+      "Type": "String",
+      "Default": "jenkins",
+      "Description": "subdomain to attach to hosted zone"
+    },
+    "JNLPPORT": {
+        "Description": "Enter Port for JNLP Slaves to connect to",
+        "Type": "String"
+    },
+    "SubnetA": {
+        "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+        "Type" : "String",
+        "Default": ""
+    },
+    "SubnetB": {
+        "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+        "Type" : "String",
+        "Default": ""
+    },
+    "AvailabilityZoneA": {
+        "Description" : "Choose Availability Zone to use: Required",
+        "Type" : "AWS::EC2::AvailabilityZone::Name",
+        "Default": ""
+    },
+    "AvailabilityZoneB": {
+        "Description" : "Choose Availability Zone to use: Required",
+        "Type" : "AWS::EC2::AvailabilityZone::Name",
+        "Default": ""
+    },
+    "AutoMin": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select minimum instance number for Auto Scaling"
+    },
+    "AutoMax": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select maximum instance number for Auto Scaling"
+    },
+    "AutoDesired": {
+        "Type": "String",
+        "Default": "1",
+        "AllowedValues": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "Description": "Select desired instance number for Auto Scaling"
+    },
+    "MasterInstanceType": {
+      "Description": "EC2 instance type for Jenkins Master",
+      "Type": "String",
+      "Default": "t2.micro",
+      "AllowedValues": [
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "m3.medium",
+        "m3.large",
+        "m3.xlarge",
+        "m3.2xlarge",
+        "c3.large",
+        "c3.xlarge",
+        "c3.2xlarge",
+        "c3.4xlarge",
+        "c3.8xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge",
+        "g2.2xlarge",
+        "r3.large",
+        "r3.xlarge",
+        "r3.2xlarge",
+        "r3.4xlarge",
+        "r3.8xlarge",
+        "i2.xlarge",
+        "i2.2xlarge",
+        "i2.4xlarge",
+        "i2.8xlarge",
+        "d2.xlarge",
+        "d2.2xlarge",
+        "d2.4xlarge",
+        "d2.8xlarge",
+        "hi1.4xlarge",
+        "hs1.8xlarge",
+        "cr1.8xlarge",
+        "cc2.8xlarge",
+        "cg1.4xlarge"
+      ],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "ECSInstanceType": {
+      "Description": "EC2 instance type for Jenkins ECS Node",
+      "Type": "String",
+      "Default": "t2.micro",
+      "AllowedValues": [
+        "t2.micro",
+        "t2.small",
+        "t2.medium",
+        "m3.medium",
+        "m3.large",
+        "m3.xlarge",
+        "m3.2xlarge",
+        "c3.large",
+        "c3.xlarge",
+        "c3.2xlarge",
+        "c3.4xlarge",
+        "c3.8xlarge",
+        "c4.large",
+        "c4.xlarge",
+        "c4.2xlarge",
+        "c4.4xlarge",
+        "c4.8xlarge",
+        "g2.2xlarge",
+        "r3.large",
+        "r3.xlarge",
+        "r3.2xlarge",
+        "r3.4xlarge",
+        "r3.8xlarge",
+        "i2.xlarge",
+        "i2.2xlarge",
+        "i2.4xlarge",
+        "i2.8xlarge",
+        "d2.xlarge",
+        "d2.2xlarge",
+        "d2.4xlarge",
+        "d2.8xlarge",
+        "hi1.4xlarge",
+        "hs1.8xlarge",
+        "cr1.8xlarge",
+        "cc2.8xlarge",
+        "cg1.4xlarge"
+      ],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "SSHSecurityGroup" : {
+      "Description" : "Select Security Group for SSH Access",
+      "Type": "AWS::EC2::SecurityGroup::Id",
+      "Default": ""
+    },
+    "ECSTemplateURL": {
+      "Description" : "URL For ECS Template",
+      "Type" : "String",
+      "Default": "https://s3-us-west-2.amazonaws.com/some-folder/jenkins_ecs_slave_autoscale.json"
+    },
+    "MasterTemplateURL": {
+      "Description" : "URL For Jenkins Master Template",
+      "Type" : "String",
+      "Default": "https://s3-us-west-2.amazonaws.com/some-folder/jenkins/jenkins_master.json"
+    },
+    "VPC": {
+      "Description" : "Choose VPC to use",
+      "Type" : "AWS::EC2::VPC::Id",
+      "Default": ""
+   }
+  },
+  "Metadata" : {
+      "AWS::CloudFormation::Interface" : {
+          "ParameterGroups" : [
+              {
+                  "Label" : { "default": "EC2 Config" },
+                  "Parameters" : ["MasterInstanceType", "ECSInstanceType", "KeyName", "SSHSecurityGroup" ]
+              },
+              {
+                  "Label" : { "default": "Autoscale Config" },
+                  "Parameters" : ["AutoMin", "AutoMax", "AutoDesired"]
+              },
+              {
+                  "Label" : { "default": "VPC Config" },
+                  "Parameters" : ["VPC", "SubnetA", "SubnetB", "AvailabilityZoneA", "AvailabilityZoneB"]
+              },
+              {
+                  "Label" : { "default": "DNS Config" },
+                  "Parameters" : ["HostedZone", "Subdomain"]
+              },
+              {
+                  "Label" : { "default": "Template Config" },
+                  "Parameters" : ["ECSTemplateURL", "MasterTemplateURL"]
+              },
+              {
+                  "Label" : { "default": "ECS Config" },
+                  "Parameters" : ["ClusterName"]
+              },
+              {
+                  "Label" : { "default": "Jenkins Config" },
+                  "Parameters" : ["JNLPPORT", "SlaveExecutors"]
+              }
+          ]
+      }
+  },
+  "Resources" : {
+    "JenkinsSubnetA" : {
+        "Type" : "AWS::EC2::Subnet",
+        "Properties" : {
+            "VpcId" : { "Ref" : "VPC" },
+            "AvailabilityZone" : { "Ref": "AvailabilityZoneA" },
+            "CidrBlock" : { "Ref" : "SubnetA" },
+            "Tags" : [
+                { "Key" : "Name", "Value" : "Jenkins-SubnetA" },
+                { "Key" : "Application", "Value" : { "Ref" : "AWS::StackId" } },
+                { "Key" : "Network", "Value" : "Public" }
+            ]
+        }
+    },
+    "JenkinsSubnetB" : {
+        "Type" : "AWS::EC2::Subnet",
+        "Properties" : {
+            "VpcId" : { "Ref" : "VPC" },
+            "AvailabilityZone" : { "Ref": "AvailabilityZoneB" },
+            "CidrBlock" : { "Ref" : "SubnetB" },
+            "Tags" : [
+                { "Key" : "Name", "Value" : "Jenkins-SubnetB" },
+                { "Key" : "Application", "Value" : { "Ref" : "AWS::StackId" } },
+                { "Key" : "Network", "Value" : "Public" }
+            ]
+        }
+    },
+   "JenkinsMasterSecurityGroup" : {
+     "Type" : "AWS::EC2::SecurityGroup",
+     "Properties" : {
+       "GroupDescription" : "Setup Ingress/Egress for Jenkins Master",
+       "VpcId" : { "Ref" : "VPC" },
+       "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "80",  "ToPort" : "80",  "CidrIp" : "0.0.0.0/0"} ,
+          { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0"} ,
+          { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : { "Ref": "SubnetA" } },
+          { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : { "Ref": "SubnetB" } } ],
+       "SecurityGroupEgress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "80",  "ToPort" : "80",  "CidrIp" : "0.0.0.0/0"} ,
+          { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0"} ,
+          { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : { "Ref": "SubnetA" } },
+          { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : { "Ref": "SubnetB" } } ],
+       "Tags" : [
+          { "Key" : "Name", "Value" : "Jenkins-Master-Security-Group" }
+       ]
+     }
+   },
+   "ECSSecurityGroup" : {
+       "Type" : "AWS::EC2::SecurityGroup",
+       "Properties" : {
+           "GroupDescription" : "Setup Ingress/Egress for Instance/App",
+           "VpcId" : { "Ref" : "VPC" },
+           "SecurityGroupIngress" : [
+             { "IpProtocol" : "tcp", "FromPort" : { "Ref" : "JNLPPORT" }, "ToPort" : { "Ref" : "JNLPPORT" }, "SourceSecurityGroupId" : { "Fn::GetAtt": [ "JenkinsMasterSecurityGroup", "GroupId" ] } } ,
+             { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "SourceSecurityGroupId" : { "Fn::GetAtt": [ "JenkinsMasterSecurityGroup", "GroupId" ] } }],
+           "SecurityGroupEgress" : [
+               { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : "0.0.0.0/0" } ],
+           "Tags" : [ { "Key" : "Name", "Value" : "ECS-Jenkins-Autoscale-Security-Group" } ]
+       }
+   },
+   "MasterENI" : {
+      "Type" : "AWS::EC2::NetworkInterface",
+      "Properties" : {
+        "Tags": [ { "Key":"Name", "Value":"Jenkins Master ENI" } ],
+        "Description": "Network Adapter for Jenkins Master.",
+        "SourceDestCheck": "false",
+        "GroupSet": [
+          { "Ref": "JenkinsMasterSecurityGroup" },
+          { "Ref": "SSHSecurityGroup" }
+        ],
+        "SubnetId": { "Ref": "JenkinsSubnetA" }
+     }
+    },
+    "MasterStack" : {
+      "Type" : "AWS::CloudFormation::Stack",
+      "DependsOn": [ "JenkinsMasterSecurityGroup"],
+      "Properties" : {
+        "TemplateURL" : { "Ref": "MasterTemplateURL" },
+        "Parameters" : {
+          "InstanceType": { "Ref": "MasterInstanceType" },
+          "KeyName" : { "Ref": "KeyName" },
+          "SSHSecurityGroup" : { "Ref": "SSHSecurityGroup" },
+          "SecurityGroup" : { "Ref": "JenkinsMasterSecurityGroup" },
+          "HostedZone": { "Ref": "HostedZone" },
+          "Subdomain": { "Ref": "Subdomain" },
+          "VPC": { "Ref": "VPC" },
+          "Subnet": { "Ref": "JenkinsSubnetA" },
+       },
+      "TimeoutInMinutes" : "15"
+      }
+    },
+    "ECSStack" : {
+      "Type" : "AWS::CloudFormation::Stack",
+      "DependsOn": [ "ECSSecurityGroup", "MasterStack" ],
+      "Properties" : {
+        "TemplateURL" : { "Ref": "ECSTemplateURL" },
+        "Parameters" : {
+          "InstanceType": { "Ref": "ECSInstanceType" },
+          "KeyName" : { "Ref": "KeyName" },
+          "SecurityGroup" : { "Ref": "ECSSecurityGroup" },
+          "HostedZone": { "Ref": "HostedZone" },
+          "Subdomain": { "Ref": "Subdomain" },
+          "AutoMin": { "Ref": "AutoMin" },
+          "AutoMax": { "Ref": "AutoMax" },
+          "AutoDesired": { "Ref": "AutoDesired" },
+          "VPC": { "Ref": "VPC" },
+          "JNLPPORT": { "Ref": "JNLPPORT" },
+          "SubnetA": { "Ref": "JenkinsSubnetA" },
+          "SubnetB": { "Ref": "JenkinsSubnetB" }
+       },
+      "TimeoutInMinutes" : "25"
+      }
+    }
+  }
+}
