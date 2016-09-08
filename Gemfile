@@ -1,0 +1,1 @@
+gem 'cloudformation-ruby-dsl'
