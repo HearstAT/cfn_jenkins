@@ -1,9 +1,7 @@
-# Jenkins Stack
+# Jenkins Cloudformation
 
-Include both standard JSON and Ruby Template version via [cloudformation-ruby-dsl](https://github.com/bazaarvoice/cloudformation-ruby-dsl)
-
-# WIP
+Our Jenkins configuration
 
 ## Info
-* Builds out Jenkins Master w/ ecs auto-scaled instances
-
+-   Builds out Jenkins Master
+-   Builds out Docker Host box for running Jenkins Jobs

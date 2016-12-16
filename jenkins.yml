@@ -1,0 +1,272 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Xenial (20161214 AMI Build) - Jenkins"
+
+Parameters:
+###############################################################################
+# Domain Configuration
+###############################################################################
+  HostedZone:
+    Type: String
+    Default: domain.com
+    Description: must match a route53 hosted domain/zone
+
+  SSLCertificateARN:
+    Type: String
+    Default: ''
+    Description: SSL Certficate ARN for SSL Certficate
+
+###############################################################################
+# Redeploy/Existing Install Configuration
+###############################################################################
+  ExistingBucketName:
+    Type: String
+    Default: ''
+    Description: Enter a Existing Bucket Name to to use (Leave blank to create new)
+
+###############################################################################
+# Jenkins Configuration
+###############################################################################
+
+  JenkinsSubdomain:
+    Type: String
+    Default: jenkins-test
+    AllowedValues:
+      - jenkins-a
+      - jenkins-b
+      - jenkins-test
+    Description: subdomain/prefix that is combined with the hosted zone entered
+
+  JenkinsVersion:
+    Type: String
+    Default: "2.19.4"
+    AllowedValues:
+      - "2.19.4"
+      - "2.19.3"
+      - "2.19.2"
+      - "2.19.1"
+      - "2.7.4"
+      - "2.7.3"
+      - "2.7.2"
+      - "2.7.1"
+    Description: Choose Jenkins Version to Install
+
+###############################################################################
+# Instance and Network Configuration
+###############################################################################
+  VPC:
+    Description: Choose VPC to use
+    Type: AWS::EC2::VPC::Id
+    Default: ''
+
+  MasterInstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+
+  SSHSecurityGroup:
+    Description: Select Security Group for SSH Access
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: ''
+
+  CIDRA:
+    Type: String
+    Default: 172.33.10.0/24
+    Description: Subnet A CIDR Block
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    -
+      Label:
+        default: Instance & Network Configuration
+      Parameters:
+        - MasterInstanceType
+        - KeyName
+        - VPC
+        - SSHSecurityGroup
+        - CIDRA
+
+Mappings:
+  RegionMap:
+    us-west-2:
+      HVM64: ami-b7a114d7
+    eu-west-1:
+      HVM64: ami-6f587e1c
+
+Resources:
+  # Create the necessary subnets for ELB
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      # Get Availability Zones and select first in string
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
+      CidrBlock: !Ref CIDRA
+      Tags:
+        - Key: Name
+          Value: Public-Subnet-A
+        - Key: Application
+          Value: !Ref AWS::StackId
+        - Key: Network
+          Value: "Public"
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Setup Ingress/Egress for Servers
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Server-Security-Group
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  # Just a placeholder role, please don't use this for real!
+  RolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "root"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+      Roles:
+        - !Ref InstanceRole
+
+  InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        -
+          !Ref InstanceRole
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", HVM64 ]
+      InstanceType: !Ref MasterInstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - !Ref ServerSecurityGroup
+            - !Ref SSHSecurityGroup
+          SubnetId:
+            Ref: SubnetA
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: '15'
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        "Fn::Base64":
+          "Fn::Sub": |
+            #!/bin/bash -xev
+
+            ##########################################################
+            # Upgrade OS & Install Dependencies
+            ##########################################################
+
+            apt-get update && apt-get -y upgrade
+            apt-get install -y wget curl python-setuptools python-pip git
+
+            ##########################################################
+            # Global Variable Set
+            ##########################################################
+
+            export DEBIAN_FRONTEND=noninteractive
+            export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            export STACKNAME='${AWS::StackName}'
+
+            ##########################################################
+            # Install cfn bootstraping tools
+            ##########################################################
+
+            if [ -z $(command -v cfn-signal) ]; then
+                easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            fi
+
+            ##########################################################
+            # Helper function to set wait timer
+            ##########################################################
+
+            error_exit()
+            {
+              cfn-signal -e 1 -r "$1" "${WaitHandle}"
+              exit 1
+            }
+
+            export -f error_exit
+
+
+            ##########################################################
+            # Add Jenkins Repo & Install
+            ##########################################################
+
+            wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
+            cat > '/etc/apt/sources.list.d/jenkins.list' << EOF
+            deb https://pkg.jenkins.io/debian-stable binary/
+            EOF
+
+            apt-get update && apt-get install jenkins=${JenkinsVersion}
+
+            ##########################################################
+            # Send Success Signal to CFN Wait Handle
+            ##########################################################
+
+            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${WaitHandle}"
+
+            ##########################################################
+            # Reboot After Success for all updates made
+            ##########################################################
+
+            reboot
+
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  WaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: Ec2Instance
+    Properties:
+      Handle:  !Ref WaitHandle
+      Timeout: '2300'
