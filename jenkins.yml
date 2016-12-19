@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "Xenial (20161214 AMI Build) - Jenkins"
+Description: "Xenial (20161214 AMI Build) - Jenkins Master and Docker Build Server"
 
 Parameters:
 ###############################################################################
@@ -51,6 +51,26 @@ Parameters:
       - "2.7.1"
     Description: Choose Jenkins Version to Install
 
+  AdminPassword:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter Password for Jenkins Admin (replaces the initial password set)
+
+  JenkinsLogLevel:
+    Type: String
+    Default: "INFO"
+    AllowedValues:
+      - "SEVERE"
+      - "WARNING"
+      - "INFO"
+      - "CONFIG"
+      - "FINE"
+      - "FINER"
+      - "FINEST"
+      - "ALL"
+    Description: Choose log level for Jenkins Master
+
 ###############################################################################
 # Instance and Network Configuration
 ###############################################################################
@@ -85,9 +105,63 @@ Parameters:
     Default: 172.33.10.0/24
     Description: Subnet A CIDR Block
 
+###############################################################################
+# Sumologic Configuration
+###############################################################################
+  SumologicAccessID:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: (Optional) Enter Sumologic Access ID
+
+  SumologicAccessKey:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: (Optional) Enter Sumologic Access Key
+
+###############################################################################
+# New Relic Configuration
+###############################################################################
+  NewRelicAppName:
+    Type: String
+    Default: ''
+    Description: (Optional) Enter New Relic Application Name; e.g.; chef_ha_stack
+
+  NewRelicLicense:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: (Optional) Enter New Relic License Key
+
+###############################################################################
+# Development Configuration
+###############################################################################
+  GitBranch:
+    Description: Enter Branch to Pull Scripts From (For Testing Only Leave Default for Prod)
+    Type: String
+    Default: 'master'
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
+    -
+      Label:
+        default: Domain Configuration
+      Parameters:
+        - HostedZone
+        - SSLCertificateARN
+    -
+      Label:
+        default: Redeploy/Existing Install Configuration
+      Parameters:
+        - ExistingBucketName
+    -
+      Label:
+        default: Jenkins Configuration
+      Parameters:
+        - JenkinsSubdomain
+        - MasterInstanceType
     -
       Label:
         default: Instance & Network Configuration
@@ -97,6 +171,23 @@ Metadata:
         - VPC
         - SSHSecurityGroup
         - CIDRA
+    -
+      Label:
+        default: Sumologic Configuration
+      Parameters:
+        - SumologicAccessID
+        - SumologicAccessKey
+    -
+      Label:
+        default: New Relic Configuration
+      Parameters:
+        - NewRelicAppName
+        - NewRelicLicense
+    -
+      Label:
+        default: Development Options
+      Parameters:
+        - GitBranch
 
 Mappings:
   RegionMap:
@@ -238,7 +329,6 @@ Resources:
 
             export -f error_exit
 
-
             ##########################################################
             # Add Jenkins Repo & Install
             ##########################################################
@@ -249,6 +339,90 @@ Resources:
             EOF
 
             apt-get update && apt-get install jenkins=${JenkinsVersion}
+
+            ##########################################################
+            # Jenkins Plugins
+            ##########################################################
+
+            cat > '/root/plugins.txt' << EOF
+            greenballs
+            token-macro
+            run-condition
+            envinject
+            conditional-buildstep
+            durable-task
+            jquery
+            aws-java-sdk
+            copyartifact
+            compress-artifacts
+            copy-to-slave
+            ssh
+            slave-status
+            ansicolor
+            antisamy-markup-formatter
+            credentials
+            git
+            git-changelog
+            git-client
+            gravatar
+            jenkins-multijob-plugin
+            matrix-auth
+            matrix-project
+            matrix-reloaded
+            pam-auth
+            parameterized-trigger
+            plain-credentials
+            ruby-runtime
+            run-condition
+            scm-api
+            ssh-credentials
+            ssh-slaves
+            s3
+            disk-usage
+            embeddable-build-status
+            docker-plugin
+            github
+            github-oauth
+            ghprb
+            EOF
+
+            ##########################################################
+            # Jenkins Setup
+            ##########################################################
+
+            service jenkins start
+
+            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+            do printf "."; sleep 1; done
+
+            sed -i -e "s@<slaveAgentPort>.*</slaveAgentPort>@<slaveAgentPort>49817</slaveAgentPort>@" /var/lib/jenkins/config.xml
+
+            service jenkins restart
+
+            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+            do printf "."; sleep 1; done
+
+            while read -r plugin;
+            do java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth install-plugin "${!plugin}" --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"; done < /root/plugins.txt
+
+            service jenkins restart
+
+            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+            do printf "."; sleep 1; done
+
+            echo 'jenkins.model.Jenkins.instance.securityRealm.createAccount("admin", "${AdminPassword}")' | java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth groovy = --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+
+            service jenkins stop
+
+            cat > '/var/lib/jenkins/setup_done.txt' << EOF
+            I be bootstrapped!
+            EOF
+
+            cat > data/log.properties <<EOF
+            handlers=java.util.logging.ConsoleHandler
+            jenkins.level=${JenkinsLogLevel}
+            java.util.logging.ConsoleHandler.level=${JenkinsLogLevel}
+            EOF
 
             ##########################################################
             # Send Success Signal to CFN Wait Handle
