@@ -27,7 +27,6 @@ Parameters:
 ###############################################################################
 # Jenkins Configuration
 ###############################################################################
-
   JenkinsSubdomain:
     Type: String
     Default: jenkins-test
@@ -72,6 +71,24 @@ Parameters:
     Description: Choose log level for Jenkins Master
 
 ###############################################################################
+# Jenkins Build Configuration
+###############################################################################
+  DockerVersion:
+    Type: String
+    Default: "1.12.5"
+    AllowedValues:
+      - "1.12.5"
+      - "1.12.4"
+      - "1.12.3"
+      - "1.12.2"
+      - "1.12.1"
+      - "1.12.0"
+      - "1.11.2"
+      - "1.11.1"
+      - "1.11.0"
+    Description: Choose Docker Version to Install
+
+###############################################################################
 # Instance and Network Configuration
 ###############################################################################
   VPC:
@@ -102,7 +119,7 @@ Parameters:
 
   CIDRA:
     Type: String
-    Default: 172.33.10.0/24
+    Default: 172.33.40.0/24
     Description: Subnet A CIDR Block
 
 ###############################################################################
@@ -126,7 +143,7 @@ Parameters:
   NewRelicAppName:
     Type: String
     Default: ''
-    Description: (Optional) Enter New Relic Application Name; e.g.; chef_ha_stack
+    Description: (Optional) Enter New Relic Application Name; e.g.; jenkins_stack
 
   NewRelicLicense:
     Type: String
@@ -160,13 +177,21 @@ Metadata:
       Label:
         default: Jenkins Configuration
       Parameters:
-        - JenkinsSubdomain
         - MasterInstanceType
+        - JenkinsSubdomain
+        - JenkinsVersion
+        - AdminPassword
+        - JenkinsLogLevel
     -
       Label:
-        default: Instance & Network Configuration
+        default: Jenkins Build Configuration
       Parameters:
-        - MasterInstanceType
+        - BuildInstanceType
+        - DockerVersion
+    -
+      Label:
+        default: Network Configuration
+      Parameters:
         - KeyName
         - VPC
         - SSHSecurityGroup
@@ -197,7 +222,10 @@ Mappings:
       HVM64: ami-6f587e1c
 
 Resources:
-  # Create the necessary subnets for ELB
+
+###############################################################################
+# Subnets
+###############################################################################
   SubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -213,25 +241,20 @@ Resources:
         - Key: Network
           Value: "Public"
 
-  ServerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+###############################################################################
+# S3 Buckets
+###############################################################################
+  JenkinsBucket:
+    Type: AWS::S3::Bucket
+    # conditional look up, if true then creates this resource.
+    Condition: JenkinsBucketCon
+    DeletionPolicy: Retain
     Properties:
-      GroupDescription: Setup Ingress/Egress for Servers
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: '0'
-          ToPort: '65535'
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: Server-Security-Group
+      AccessControl: Private
 
+###############################################################################
+# Security: IAM, Groups, Instance Profiles
+###############################################################################
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -247,29 +270,106 @@ Resources:
               - "sts:AssumeRole"
       Path: "/"
 
-  # Just a placeholder role, please don't use this for real!
   RolePolicies:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: "root"
+      PolicyName: !Sub ${AWS::StackName}-JenkinsServer-Policy
       PolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
-          -
-            Effect: "Allow"
-            Action: "*"
+          # Allow all actions to one bucket (the supplied one, or the one you provided)
+          - Action: s3:*
+            Effect: Allow
+            Resource:
+              - !Join ['', [ 'arn:aws:s3:::', !If [JenkinsBucketCon, !Ref JenkinsBucket, !Ref ExistingBucketName] ]]
+              - !Join ['', [ 'arn:aws:s3:::', !If [JenkinsBucketCon, !Ref JenkinsBucket, !Ref ExistingBucketName], '/*' ]]
+          # Allow ability to list all buckets
+          - Action: s3:List*
+            Effect: Allow
+            Resource: arn:aws:s3:::*
+          # Allow instances to read their own tags (needed for setup script below)
+          - Action: ec2:DescribeTags
+            Effect: Allow
             Resource: "*"
       Roles:
         - !Ref InstanceRole
 
-  InstanceProfile:
-    Type: "AWS::IAM::InstanceProfile"
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      Path: "/"
-      Roles:
-        -
-          !Ref InstanceRole
+      GroupDescription: Setup Ingress/Egress for Jenkins ELB
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${JenkinsSubdomain}-ELB-SecurityGroup
 
+  MasterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Setup Ingress/Egress for Servers
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref BuildSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          SourceSecurityGroupId: !Ref SSHSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Server-Security-Group
+
+  BuildSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Setup Ingress/Egress for Servers
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: !Sub ${}/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          SourceSecurityGroupId: !Ref SSHSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Server-Security-Group
+
+###############################################################################
+# Jenkins Master
+###############################################################################
   Ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
@@ -423,6 +523,95 @@ Resources:
             jenkins.level=${JenkinsLogLevel}
             java.util.logging.ConsoleHandler.level=${JenkinsLogLevel}
             EOF
+
+            ##########################################################
+            # Send Success Signal to CFN Wait Handle
+            ##########################################################
+
+            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${WaitHandle}"
+
+            ##########################################################
+            # Reboot After Success for all updates made
+            ##########################################################
+
+            reboot
+
+###############################################################################
+# Jenkins Build/Docker Host
+###############################################################################
+
+  BuildInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", HVM64 ]
+      InstanceType: !Ref MasterInstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - !Ref ServerSecurityGroup
+            - !Ref SSHSecurityGroup
+          SubnetId:
+            Ref: SubnetA
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: '15'
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        "Fn::Base64":
+          "Fn::Sub": |
+            #!/bin/bash -xev
+
+            ##########################################################
+            # Upgrade OS & Install Dependencies
+            ##########################################################
+
+            apt-get update && apt-get -y upgrade
+            apt-get install -y wget curl python-setuptools python-pip git
+
+            ##########################################################
+            # Global Variable Set
+            ##########################################################
+
+            export DEBIAN_FRONTEND=noninteractive
+            export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            export STACKNAME='${AWS::StackName}'
+
+            ##########################################################
+            # Install cfn bootstraping tools
+            ##########################################################
+
+            if [ -z $(command -v cfn-signal) ]; then
+                easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            fi
+
+            ##########################################################
+            # Helper function to set wait timer
+            ##########################################################
+
+            error_exit()
+            {
+              cfn-signal -e 1 -r "$1" "${WaitHandle}"
+              exit 1
+            }
+
+            export -f error_exit
+
+            ##########################################################
+            # Add Docker Repo & Install
+            ##########################################################
+
+            apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+            apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
+
+            apt-get update && apt-get install docker-engine=${DockerVersion}
+
+            ##########################################################
+            # Docker Setup
+            ##########################################################
+
 
             ##########################################################
             # Send Success Signal to CFN Wait Handle
