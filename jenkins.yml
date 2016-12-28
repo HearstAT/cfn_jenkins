@@ -38,8 +38,9 @@ Parameters:
 
   JenkinsVersion:
     Type: String
-    Default: "2.19.4"
+    Default: "2.32.1"
     AllowedValues:
+      - "2.32.1"
       - "2.19.4"
       - "2.19.3"
       - "2.19.2"
@@ -70,6 +71,17 @@ Parameters:
       - "ALL"
     Description: Choose log level for Jenkins Master
 
+  MasterInstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+
 ###############################################################################
 # Jenkins Build Configuration
 ###############################################################################
@@ -88,6 +100,17 @@ Parameters:
       - "1.11.0"
     Description: Choose Docker Version to Install
 
+  BuildInstanceType:
+    Type: String
+    Default: t2.small
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+
 ###############################################################################
 # Instance and Network Configuration
 ###############################################################################
@@ -95,18 +118,6 @@ Parameters:
     Description: Choose VPC to use
     Type: AWS::EC2::VPC::Id
     Default: ''
-
-  MasterInstanceType:
-    Type: String
-    Default: t2.micro
-    AllowedValues:
-      - t2.nano
-      - t2.micro
-      - t2.small
-      - t2.medium
-      - t2.large
-
-    ConstraintDescription: must be a valid EC2 instance type.
 
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
@@ -214,6 +225,11 @@ Metadata:
       Parameters:
         - GitBranch
 
+Conditions:
+  # Creates bucket if no existing name entered
+  JenkinsBucketCon:
+    !Equals [ !Ref ExistingBucketName, '' ]
+
 Mappings:
   RegionMap:
     us-west-2:
@@ -222,7 +238,6 @@ Mappings:
       HVM64: ami-6f587e1c
 
 Resources:
-
 ###############################################################################
 # Subnets
 ###############################################################################
@@ -253,8 +268,22 @@ Resources:
       AccessControl: Private
 
 ###############################################################################
+# EIP
+###############################################################################
+  MasterEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: VPC
+
+###############################################################################
 # Security: IAM, Groups, Instance Profiles
 ###############################################################################
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref InstanceRole
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -353,7 +382,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: '0'
           ToPort: '65535'
-          CidrIp: !Sub ${}/32
+          CidrIp: !Sub "${MasterEIP}/32"
         - IpProtocol: tcp
           FromPort: '22'
           ToPort: '22'
@@ -368,9 +397,52 @@ Resources:
           Value: Server-Security-Group
 
 ###############################################################################
+# Load Balancer (For SSL) and DNS
+###############################################################################
+  ElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      HealthCheck:
+        HealthyThreshold: '2'
+        Interval: '90'
+        Target: HTTP:80/login
+        Timeout: '60'
+        UnhealthyThreshold: '10'
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      LBCookieStickinessPolicy:
+        - PolicyName: PublicELBCookieStickinessPolicy
+          CookieExpirationPeriod: '3600'
+      Listeners:
+        - InstancePort: '80'
+          LoadBalancerPort: '443'
+          InstanceProtocol: HTTP
+          Protocol: HTTPS
+          PolicyNames:
+            - PublicELBCookieStickinessPolicy
+          SSLCertificateId: !Ref SSLCertificateARN
+      Tags:
+        - Key: Name
+          Value: !Sub ${JenkinsSubdomain}-ELB
+
+  JenkinsDNS:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      # Use sub to treat params and resources like variables http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+      HostedZoneName: !Sub "${HostedZone}."
+      Comment: !Sub Zone apex alias targeted to ${JenkinsSubdomain} ELB.
+      RecordSets:
+          # Create DNS A Record by joining ChefSubdomain + HostedZone
+        - Name: !Join [ '', [ !Ref JenkinsSubdomain, ".", !Ref HostedZone, "." ] ]
+          Type: A
+          AliasTarget:
+            HostedZoneId: !GetAtt ElasticLoadBalancer.CanonicalHostedZoneNameID
+            DNSName: !GetAtt ElasticLoadBalancer.CanonicalHostedZoneName
+
+###############################################################################
 # Jenkins Master
 ###############################################################################
-  Ec2Instance:
+  MasterInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", HVM64 ]
@@ -380,7 +452,7 @@ Resources:
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
           GroupSet:
-            - !Ref ServerSecurityGroup
+            - !Ref MasterSecurityGroup
             - !Ref SSHSecurityGroup
           SubnetId:
             Ref: SubnetA
@@ -408,6 +480,7 @@ Resources:
             export DEBIAN_FRONTEND=noninteractive
             export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             export STACKNAME='${AWS::StackName}'
+            export HOSTNAME="${JenkinsSubdomain}.${HostedZone}"
 
             ##########################################################
             # Install cfn bootstraping tools
@@ -423,22 +496,31 @@ Resources:
 
             error_exit()
             {
-              cfn-signal -e 1 -r "$1" "${WaitHandle}"
+              cfn-signal -e 1 -r "$1" "${MasterWaitHandle}"
               exit 1
             }
 
             export -f error_exit
 
             ##########################################################
+            # Set Hostname and Hosts File
+            ##########################################################
+
+            hostname ${!HOSTNAME} || error_exit 'Failed to set hostname'
+            echo "${!HOSTNAME}" > /etc/hostname || error_exit 'Failed to set hostname file'
+
+            cat > '/etc/hosts' << EOF
+            127.0.0.1 ${!HOSTNAME} ${!HOSTNAME%%.*} jenkins.${!HOSTNAME%%.*} localhost
+            ::1 localhost6.localdomain6 localhost6
+            EOF
+
+            ##########################################################
             # Add Jenkins Repo & Install
             ##########################################################
 
             wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | apt-key add -
-            cat > '/etc/apt/sources.list.d/jenkins.list' << EOF
-            deb https://pkg.jenkins.io/debian-stable binary/
-            EOF
 
-            apt-get update && apt-get install jenkins=${JenkinsVersion}
+            JENKINSMASTER=$(mktemp); wget "https://pkg.jenkins.io/debian-stable/binary/jenkins_${JenkinsVersion}_all.deb" -qO $JENKINSMASTER && dpkg -i $JENKINSMASTER; rm $JENKINSMASTER || error_exit "Failed to Jenkins"
 
             ##########################################################
             # Jenkins Plugins
@@ -490,67 +572,137 @@ Resources:
             # Jenkins Setup
             ##########################################################
 
-            service jenkins start
+            groupadd -g jenkins
+            useradd -d "/var/lib/jenkins" -m -s /bin/bash jenkins
 
-            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
-            do printf "."; sleep 1; done
+            mkdir -p /etc/sysconfig/ /var/run/jenkins/
 
-            sed -i -e "s@<slaveAgentPort>.*</slaveAgentPort>@<slaveAgentPort>49817</slaveAgentPort>@" /var/lib/jenkins/config.xml
+            cat > '/lib/systemd/system/jenkins.service' << 'EOF'
+            [Unit]
+            Description=Jenkins
+            After=network.target
+            Requires=network.target
 
-            service jenkins restart
+            [Service]
+            Type=simple
+            User=jenkins
+            Group=jenkins
+            EnvironmentFile=/etc/sysconfig/jenkins
+            PIDFile=/var/run/jenkins/jenkins.pid
+            ExecStartPre=/bin/rm -f /var/run/jenkins/jenkins.pid
+            ExecStart=/usr/bin/java ${!JENKINS_JAVA_OPTIONS} -jar /usr/share/jenkins/jenkins.war --httpPort=${!JENKINS_PORT} --httpListenAddress=${!JENKINS_LISTEN_ADDRESS} ${!JENKINS_ARGS}
+            ExecStop=/bin/kill -INT $MAINPID
+            Restart=always
+            RestartSec=20
 
-            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
-            do printf "."; sleep 1; done
-
-            while read -r plugin;
-            do java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth install-plugin "${!plugin}" --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"; done < /root/plugins.txt
-
-            service jenkins restart
-
-            until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
-            do printf "."; sleep 1; done
-
-            echo 'jenkins.model.Jenkins.instance.securityRealm.createAccount("admin", "${AdminPassword}")' | java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth groovy = --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
-
-            service jenkins stop
-
-            cat > '/var/lib/jenkins/setup_done.txt' << EOF
-            I be bootstrapped!
+            [Install]
+            WantedBy=multi-user.target
             EOF
 
-            cat > data/log.properties <<EOF
+            cat > '/etc/sysconfig/jenkins' << 'EOF'
+            JENKINS_JAVA_OPTIONS=
+            JENKINS_PORT=80
+            JENKINS_ARGS=
+            JENKINS_LISTEN_ADDRESS=localhost
+            EOF
+
+            if [ !f '/var/lib/jenkins/setup_done.txt' ]; then
+              service jenkins start
+
+              until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+              do printf "."; sleep 1; done
+
+              service jenkins restart
+
+              until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /cvar/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+              do printf "."; sleep 1; done
+
+              while read -r plugin;
+              do java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth install-plugin "${!plugin}" --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"; done < /root/plugins.txt
+
+              service jenkins restart
+
+              until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
+              do printf "."; sleep 1; done
+
+              echo 'jenkins.model.Jenkins.instance.securityRealm.createAccount("admin", "${AdminPassword}")' | java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth groovy = --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+
+              service jenkins stop
+
+              cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
+              ${JenkinsVersion}
+              EOF
+
+              cat > '/var/lib/jenkins/jenkins.install.UpgradeWizard.state' << EOF
+              ${JenkinsVersion}
+              EOF
+
+              cat > '/var/lib/jenkins/setup_done.txt' << EOF
+              I be bootstrapped!
+              EOF
+            fi
+
+            mkdir -p /var/lib/jenkins/data
+
+            cat > '/var/lib/jenkins/data/log.properties' << EOF
             handlers=java.util.logging.ConsoleHandler
             jenkins.level=${JenkinsLogLevel}
             java.util.logging.ConsoleHandler.level=${JenkinsLogLevel}
             EOF
 
             ##########################################################
+            # NewRelic Config if Enabled
+            ##########################################################
+            ## No need to for error_exit here, it's exported and utilized inside the script
+            if [ -n "${NewRelicLicense}" ]; then
+              wget -qO /root/newrelic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/newrelic.sh' && bash /root/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+            fi
+
+            ##########################################################
+            # Sumologic Config if Enabled
+            ##########################################################
+            ## No need to for error_exit here, it's exported and utilized inside the script
+            if [ -n "${SumologicAccessID}" ]; then
+              wget -qO /root/sumologic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/sumologic.sh' && bash /root/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
+            fi
+
+            ##########################################################
             # Send Success Signal to CFN Wait Handle
             ##########################################################
 
-            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${WaitHandle}"
+            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${MasterWaitHandle}"
 
             ##########################################################
             # Reboot After Success for all updates made
             ##########################################################
 
+            apt-get update && apt-get -y upgrade
             reboot
+      Tags:
+        - Key: Name
+          Value: !Sub Jenkins-Master-${AWS::StackName}
+          PropagateAtLaunch: true
+
+  MasterEIPAssign:
+    Type: "AWS::EC2::EIPAssociation"
+    Properties:
+      EIP: !Ref MasterEIP
+      InstanceId: !Ref MasterInstance
 
 ###############################################################################
 # Jenkins Build/Docker Host
 ###############################################################################
-
   BuildInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", HVM64 ]
-      InstanceType: !Ref MasterInstanceType
+      InstanceType: !Ref BuildInstanceType
       KeyName: !Ref KeyName
       NetworkInterfaces:
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
           GroupSet:
-            - !Ref ServerSecurityGroup
+            - !Ref BuildSecurityGroup
             - !Ref SSHSecurityGroup
           SubnetId:
             Ref: SubnetA
@@ -578,6 +730,12 @@ Resources:
             export DEBIAN_FRONTEND=noninteractive
             export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             export STACKNAME='${AWS::StackName}'
+            export HOSTNAME="${JenkinsSubdomain}-build-${!INSTANCE_ID}.${HostedZone}"
+            if [ "${DockerVersion}" <= '1.12.4' ]; then
+              export DOCKERVERSION='${DockerVersion}-0~ubuntu-xenial'
+            else
+              export DOCKERVERSION='${DockerVersion}-0~xenial'
+            fi
 
             ##########################################################
             # Install cfn bootstraping tools
@@ -593,11 +751,23 @@ Resources:
 
             error_exit()
             {
-              cfn-signal -e 1 -r "$1" "${WaitHandle}"
+              cfn-signal -e 1 -r "$1" "${BuildWaitHandle}"
               exit 1
             }
 
             export -f error_exit
+
+            ##########################################################
+            # Set Hostname and Hosts File
+            ##########################################################
+
+            hostname ${!HOSTNAME} || error_exit 'Failed to set hostname'
+            echo "${!HOSTNAME}" > /etc/hostname || error_exit 'Failed to set hostname file'
+
+            cat > '/etc/hosts' << EOF
+            127.0.0.1 ${!HOSTNAME} ${!HOSTNAME%%.*} localhost
+            ::1 localhost6.localdomain6 localhost6
+            EOF
 
             ##########################################################
             # Add Docker Repo & Install
@@ -606,7 +776,7 @@ Resources:
             apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
             apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
 
-            apt-get update && apt-get install docker-engine=${DockerVersion}
+            apt-get update && apt-get install docker-engine=${!DOCKERVERSION}
 
             ##########################################################
             # Docker Setup
@@ -614,22 +784,53 @@ Resources:
 
 
             ##########################################################
+            # NewRelic Config if Enabled
+            ##########################################################
+            ## No need to for error_exit here, it's exported and utilized inside the script
+            if [ -n "${NewRelicLicense}" ]; then
+              wget -qO /root/newrelic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/newrelic.sh' && bash /root/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+            fi
+
+            ##########################################################
+            # Sumologic Config if Enabled
+            ##########################################################
+            ## No need to for error_exit here, it's exported and utilized inside the script
+            if [ -n "${SumologicAccessID}" ]; then
+              wget -qO /root/sumologic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/sumologic.sh' && bash /root/sumologic.sh proxy ${SumologicAccessID} ${SumologicAccessKey}
+            fi
+
+            ##########################################################
             # Send Success Signal to CFN Wait Handle
             ##########################################################
 
-            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${WaitHandle}"
+            /usr/local/bin/cfn-signal -e 0 -r 'Server setup complete' "${BuildWaitHandle}"
 
             ##########################################################
             # Reboot After Success for all updates made
             ##########################################################
 
+            apt-get update && apt-get -y upgrade
             reboot
 
-  WaitHandle:
+      Tags:
+        - Key: Name
+          Value: !Sub Jenkins-Build-Server-${AWS::StackName}
+          PropagateAtLaunch: true
+
+  MasterWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
-  WaitCondition:
+  MasterWaitCondition:
     Type: AWS::CloudFormation::WaitCondition
-    DependsOn: Ec2Instance
+    DependsOn: MasterInstance
     Properties:
-      Handle:  !Ref WaitHandle
-      Timeout: '2300'
+      Handle:  !Ref MasterWaitHandle
+      Timeout: '900'
+
+  BuildWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  BuildWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: BuildInstance
+    Properties:
+      Handle:  !Ref BuildWaitHandle
+      Timeout: '900'
