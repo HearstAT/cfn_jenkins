@@ -3,9 +3,9 @@
 ################################
 # USAGE:
 #
-# ./newrelic.sh license_key app_name
+# ./newrelic.sh license_key
 #
-# ./newrelic.sh j3u90djfsjfa8u chef_stack
+# ./newrelic.sh j3u90djfsjfa8u
 ################################
 
 ##################################################
@@ -13,7 +13,6 @@
 ##################################################
 
 LICENSE_KEY=${1}
-APP_NAME=${2}
 
 #######################################################
 # Setup Newrelic Source List & Install System Monitor

@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hudson.plugins.s3.S3BucketPublisher_-DescriptorImpl plugin="s3@0.8">
+  <profiles>
+    <hudson.plugins.s3.S3Profile>
+      <name>S3_IAM</name>
+      <accessKey></accessKey>
+      <secretKey></secretKey>
+      <proxyHost></proxyHost>
+      <proxyPort></proxyPort>
+      <maxUploadRetries>5</maxUploadRetries>
+      <retryWaitTime>5</retryWaitTime>
+      <useRole>true</useRole>
+      <signedUrlExpirySeconds>60</signedUrlExpirySeconds>
+    </hudson.plugins.s3.S3Profile>
+  </profiles>
+  <regions>
+    <com.amazonaws.regions.Regions>GovCloud</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>US_EAST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>US_WEST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>US_WEST_2</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>EU_WEST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>EU_CENTRAL_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>AP_SOUTHEAST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>AP_SOUTHEAST_2</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>AP_NORTHEAST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>SA_EAST_1</com.amazonaws.regions.Regions>
+    <com.amazonaws.regions.Regions>CN_NORTH_1</com.amazonaws.regions.Regions>
+  </regions>
+  <storageClasses>
+    <string>STANDARD</string>
+    <string>REDUCED_REDUNDANCY</string>
+  </storageClasses>
+</hudson.plugins.s3.S3BucketPublisher_-DescriptorImpl>
