@@ -521,6 +521,7 @@ Resources:
               ##########################################################
               # Jenkins User Add
               ##########################################################
+
               groupadd -g jenkins || error_exit "Failed to create Jenkins Group"
               useradd -d "/var/lib/jenkins" -m -s /bin/bash jenkins || error_exit "Failed to create Jenkins User"
               usermod -aG jenkins jenkins || error_exit "Failed to add Jenkins user to Jenkins Group"
@@ -528,6 +529,7 @@ Resources:
               ##########################################################
               # Add Jenkins Repo & Install
               ##########################################################
+
               mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to create Jenkins directories"
               wget "http://mirrors.jenkins.io/war-stable/${JenkinsVersion}/jenkins.war" -qO /usr/share/jenkins/jenkins.war || error_exit "Failed to download Jenkins war"
               chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to change Jenkins directory mode"
@@ -537,7 +539,6 @@ Resources:
               ##########################################################
               # Jenkins Log & Service Configuration
               ##########################################################
-
 
               cat > '/lib/systemd/system/jenkins.service' << 'EOF'
               [Unit]
@@ -563,6 +564,7 @@ Resources:
               ##########################################################
               # Clone Script Repo
               ##########################################################
+
               cd /root && git clone ${GitClone} || error_exit "Failed to Clone Scripts from Repo"
 
               if [ '${GitBranch}' != 'master' ]; then
@@ -572,6 +574,7 @@ Resources:
               ##########################################################
               # Jenkins Sync & Bootstrap
               ##########################################################
+
               if [ -n ${ExistingBucketName} ]; then
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Failed to sync existing data"
               fi
@@ -624,7 +627,7 @@ Resources:
               ##########################################################
               # NewRelic Config if Enabled
               ##########################################################
-              ## No need to for error_exit here, it's exported and utilized inside the script
+
               if [ -n "${NewRelicLicense}" ]; then
                 bash /root/cfn_jenkins/scripts/bootstrap/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
               fi
@@ -632,7 +635,7 @@ Resources:
               ##########################################################
               # Sumologic Config if Enabled
               ##########################################################
-              ## No need to for error_exit here, it's exported and utilized inside the script
+
               if [ -n "${SumologicAccessID}" ]; then
                 bash /root/cfn_jenkins/scripts/bootstrap/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
               fi
@@ -646,8 +649,10 @@ Resources:
               ##########################################################
               # Reboot After Success for all updates made
               ##########################################################
+
               apt-get update && apt-get -y upgrade
               reboot
+
             - { BUCKET: !If [ JenkinsBucketCon, !Ref JenkinsBucket, !Ref ExistingBucketName ] }
 
       Tags:
@@ -758,7 +763,7 @@ Resources:
             ##########################################################
             # NewRelic Config if Enabled
             ##########################################################
-            ## No need to for error_exit here, it's exported and utilized inside the script
+
             if [ -n "${NewRelicLicense}" ]; then
               wget -qO /root/newrelic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/newrelic.sh' && bash /root/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
             fi
@@ -766,7 +771,7 @@ Resources:
             ##########################################################
             # Sumologic Config if Enabled
             ##########################################################
-            ## No need to for error_exit here, it's exported and utilized inside the script
+
             if [ -n "${SumologicAccessID}" ]; then
               wget -qO /root/sumologic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/sumologic.sh' && bash /root/sumologic.sh proxy ${SumologicAccessID} ${SumologicAccessKey}
             fi
