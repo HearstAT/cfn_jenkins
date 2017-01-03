@@ -51,11 +51,16 @@ Parameters:
       - "2.7.1"
     Description: Choose Jenkins Version to Install
 
+  AdminUsername:
+    Type: String
+    Default: ''
+    Description: Enter Username for Jenkins Local Admin
+
   AdminPassword:
     Type: String
     NoEcho: 'true'
     Default: ''
-    Description: Enter Password for Jenkins Admin (replaces the initial password set)
+    Description: Enter Password for Jenkins Admin
 
   JenkinsLogLevel:
     Type: String
@@ -81,6 +86,52 @@ Parameters:
       - t2.medium
       - t2.large
     ConstraintDescription: must be a valid EC2 instance type.
+
+###############################################################################
+# Plugins Configuration
+###############################################################################
+  GithubEmail:
+    Type: String
+    Default: ''
+    Description: Enter Github Commit Email
+
+  GithubOrg:
+    Type: String
+    Default: ''
+    Description: Enter Github Organization (Auth Org)
+
+  GithubAdmins:
+    Type: String
+    Default: ''
+    Description: Enter Github Users that will be Jenkins Admins
+
+  GithubClientID:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter Github oauth ClientID
+
+  GithubClientSecret:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter Github oauth ClientSecret
+
+  SlackTeam:
+    Type: String
+    Default: ''
+    Description: Enter Slack Team
+
+  SlackRoom:
+    Type: String
+    Default: ''
+    Description: Enter Default Slack Room/Channel for Job Post (ID Recommended)
+
+  SlackToken:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter Slack Token
 
 ###############################################################################
 # Jenkins Build Configuration
@@ -195,8 +246,21 @@ Metadata:
         - MasterInstanceType
         - JenkinsSubdomain
         - JenkinsVersion
+        - AdminUsername
         - AdminPassword
         - JenkinsLogLevel
+    -
+      Label:
+        default: Plugins Configuration
+      Parameters:
+        - GithubAdmins
+        - GithubOrg
+        - GithubEmail
+        - GithubClientID
+        - GithubClientSecret
+        - SlackTeam
+        - SlackRoom
+        - SlackToken
     -
       Label:
         default: Jenkins Build Configuration
@@ -227,6 +291,7 @@ Metadata:
       Label:
         default: Development Options
       Parameters:
+        - GitClone
         - GitBranch
 
 Conditions:
@@ -475,7 +540,7 @@ Resources:
               ##########################################################
 
               apt-get update && apt-get -y upgrade
-              apt-get install -y wget curl python-setuptools python-pip git
+              apt-get install -y wget curl python-setuptools python-pip git apt-transport-https
 
               ##########################################################
               # Global Variable Set
@@ -522,27 +587,34 @@ Resources:
               # Jenkins User Add
               ##########################################################
 
-              groupadd -g jenkins || error_exit "Failed to create Jenkins Group"
               useradd -d "/var/lib/jenkins" -m -s /bin/bash jenkins || error_exit "Failed to create Jenkins User"
-              usermod -aG jenkins jenkins || error_exit "Failed to add Jenkins user to Jenkins Group"
 
               ##########################################################
               # Add Jenkins Repo & Install
               ##########################################################
 
+              ## Dependencies
+              apt-get install -y ca-certificates-java daemon dbus default-jre-headless \
+              fontconfig-config fonts-dejavu-core java-common jenkins libavahi-client3 \
+              libavahi-common-data libavahi-common3 libcap-ng0 libcups2 libdbus-1-3 libexpat1 \
+              libfontconfig1 libfreetype6 libjpeg-turbo8 libjpeg8 liblcms2-2 libnspr4 libnss3 \
+              libnss3-nssdb libpcsclite1 libpng12-0 libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 libxext6 libxi6 \
+              libxrender1 libxtst6 net-tools openjdk-8-jre-headless psmisc ucf x11-common
+
+              ## User war download to control version
               mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to create Jenkins directories"
               wget "http://mirrors.jenkins.io/war-stable/${JenkinsVersion}/jenkins.war" -qO /usr/share/jenkins/jenkins.war || error_exit "Failed to download Jenkins war"
               chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to change Jenkins directory mode"
               chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to change Jenkins directory owner"
 
-
               ##########################################################
               # Jenkins Log & Service Configuration
               ##########################################################
 
+              ## Systemd Service File
               cat > '/lib/systemd/system/jenkins.service' << 'EOF'
               [Unit]
-              Description=Jenkins
+              Description=jenkins
               After=network.target
               Requires=network.target
 
@@ -560,6 +632,8 @@ Resources:
               [Install]
               WantedBy=multi-user.target
               EOF
+
+              systemctl enable jenkins || error_exit "Failed to enable Jenkins"
 
               ##########################################################
               # Clone Script Repo
@@ -579,6 +653,20 @@ Resources:
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Failed to sync existing data"
               fi
 
+              ## Swap Placeholders with Params
+              sed -i 's/replaceAdminUser/${AdminUsername}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
+              sed -i 's/replaceAdminPassword/${AdminPassword}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceGitEmail/${GithubEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+
               mkdir -p /var/lib/jenkins/init.groovy.d || error_exit "Failed to Groovy Init Directory"
               cp -rf /root/cfn_jenkins/scripts/init /var/lib/jenkins/init.groovy.d || error_exit "Failed to copy groovy init scripts"
 
@@ -590,33 +678,21 @@ Resources:
 
               curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy)" https://${JenkinsSubdomain}.${HostedZone} || error_exit "Failed to run Groovy bootstrap Script"
 
-              if [ !f '/var/lib/jenkins/setup_done.txt' ]; then
+              systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
-                until $(curl -s -m 60 -o /dev/null -I -f -u "admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)" http://localhost:8080/cli/);
-                do printf "."; sleep 1; done
+              cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
+              ${JenkinsVersion}
+              EOF
 
-                echo 'jenkins.model.Jenkins.instance.securityRealm.createAccount("admin", "${AdminPassword}")' | java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s "http://localhost:8080/" -noKeyAuth groovy = --username admin --password "$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+              cat > '/var/lib/jenkins/jenkins.install.UpgradeWizard.state' << EOF
+              ${JenkinsVersion}
+              EOF
 
-                systemctl stop jenkins || error_exit "Failed to stop Jenkins"
+              systemctl start jenkins || error_exit "Failed to start Jenkins"
 
-                cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
-                ${JenkinsVersion}
-                EOF
+              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --include "*.xml" --include "*.key" --include "secrets/*"
 
-                cat > '/var/lib/jenkins/jenkins.install.UpgradeWizard.state' << EOF
-                ${JenkinsVersion}
-                EOF
-
-                cat > '/var/lib/jenkins/setup_done.txt' << EOF
-                I be bootstrapped!
-                EOF
-
-                systemctl start jenkins || error_exit "Failed to start Jenkins"
-              fi
-
-              aws s3 cp /var/lib/jenkins/ s3://${BUCKET}/jenkins
-
-              mkdir -p /var/lib/jenkins/data
+              mkdir -p /var/lib/jenkins/data || error_exit "Failed to create Jenkins data directory"
 
               cat > '/var/lib/jenkins/data/log.properties' << EOF
               handlers=java.util.logging.ConsoleHandler
@@ -653,7 +729,7 @@ Resources:
               apt-get update && apt-get -y upgrade
               reboot
 
-            - { BUCKET: !If [ JenkinsBucketCon, !Ref JenkinsBucket, !Ref ExistingBucketName ] }
+            - { BUCKET: !If [ JenkinsBucketCon, !Ref JenkinsBucket, !Ref ExistingBucketName ], DOCKERIP: !GetAtt BuildInstance.PrivateIp }
 
       Tags:
         - Key: Name
@@ -759,6 +835,11 @@ Resources:
             # Docker Setup
             ##########################################################
 
+            cat > '/etc/default/docker' << 'EOF'
+            DOCKER="/usr/bin/docker"
+
+            DOCKER_OPTS="-H tcp://127.0.0.1:79800 -H unix:///var/run/docker.sock --pidfile=/var/run/docker.pid --tlsverify=false"
+            EOF
 
             ##########################################################
             # NewRelic Config if Enabled

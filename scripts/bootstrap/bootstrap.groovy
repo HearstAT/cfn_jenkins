@@ -1,3 +1,4 @@
+import jenkins.*
 import jenkins.model.*
 import hudson.security.*
 import org.jenkinsci.plugins.GithubSecurityRealm
@@ -9,17 +10,19 @@ import net.sf.json.JSONArray
 import net.sf.json.JSONObject
 import org.kohsuke.stapler.StaplerRequest
 
-def instance = Jenkins.getInstance()
-def jenkinsLocationConfiguration = JenkinsLocationConfiguration.get()
-def git_desc = instance.getDescriptor("hudson.plugins.git.GitSCM")
-
+// Variable Set
+instance = Jenkins.getInstance()
+jenkinsLocationConfiguration = JenkinsLocationConfiguration.get()
+git_desc = instance.getDescriptor("hudson.plugins.git.GitSCM")
+domain = Domain.global()
+store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
 
 //Github Auth Configuration
-String githubWebUri = 'https://github.com'
-String githubApiUri = 'https://api.github.com'
-String clientID = 'replaceClientID'
-String clientSecret = 'replaceClientSecret'
-String oauthScopes = 'read:org'
+githubWebUri = 'https://github.com'
+githubApiUri = 'https://api.github.com'
+clientID = 'replaceClientID'
+clientSecret = 'replaceClientSecret'
+oauthScopes = 'read:org'
 SecurityRealm github_realm = new GithubSecurityRealm(githubWebUri, githubApiUri, clientID, clientSecret, oauthScopes)
 //check for equality, no need to modify the runtime if no settings changed
 if(!github_realm.equals(instance.getSecurityRealm())) {
@@ -28,9 +31,10 @@ if(!github_realm.equals(instance.getSecurityRealm())) {
   instance.save()
 }
 
-String adminUserNames = 'admin'
+//Set Github Users as Admins
+adminUserNames = 'replaceGithubAdmins'
 //Participant in Organization
-String organizationNames = 'replaceGithubOrg'
+organizationNames = 'replaceGithubOrg'
 //Use Github repository permissions
 boolean useRepositoryPermissions = true
 //Grant READ permissions to all Authenticated Users
@@ -69,20 +73,17 @@ git_desc.setGlobalConfigEmail("replaceGitEmail")
 
 git_desc.save()
 
-//Slack Configuration
-def slack = instance.getExtensionList(jenkins.plugins.slack.SlackNotifier.DescriptorImpl.class)[0]
-def params = [
-  slackTeamDomain: "replaceSlackTeam",
-  slackToken: "repleaceSlackToken",
-  slackRoom: "replaceSlackRoom",
-  slackBuildServerUrl: "https://jenkins.replaceDomain",
-  slackSendAs: "Jenkins"
-]
-def req = [
-  getParameter: { name -> params[name] }
-] as org.kohsuke.stapler.StaplerRequest
-slack.configure(req, null)
-slack.save()
+//Disable CLI access over /cli URL
+def removal = { lst ->
+    lst.each { x ->
+        if(x.getClass().name.contains("CLIAction")) {
+            lst.remove(x)
+        }
+    }
+}
+
+removal(instance.getExtensionList(RootAction.class))
+removal(instance.actions)
 
 //Privacy Configuration
 if(Jenkins.instance.isUsageStatisticsCollected()) {
@@ -92,9 +93,9 @@ if(Jenkins.instance.isUsageStatisticsCollected()) {
 }
 
 //Configure Credentials
-
 SystemCredentialsProvider system_creds = SystemCredentialsProvider.getInstance()
 Boolean foundDocker=false
+Boolean foundSlack=false
 
 system_creds.getCredentials().each{
     if('jenkins-docker-server'.equals(it.getId())) {
@@ -114,11 +115,33 @@ if(!foundDocker) {
     println 'Added docker cloud credentials.'
 }
 
+system_creds.getCredentials().each{
+    if('slack-integration-token'.equals(it.getId())) {
+        foundSlack=true
+    }
+}
+if(!foundSlack) {
+  secretText = new StringCredentialsImpl(CredentialsScope.GLOBAL,
+                                         'slack-integration-token',
+                                         'Slack Integration Token',
+                                         Secret.fromString("replaceSlackToken"))
+    store.addCredentials(domain, secretText)
+    println 'Added slack token'
+}
+
+//Slack Configuration
+def slack = jenkins.getDescriptorByType(jenkins.plugins.slack.SlackNotifier.DescriptorImpl)
+slack.teamDomain = "replaceSlackTeam"
+slack.authTokenCredentialId = "slack-integration-token"
+slack.sendAs = "Jenkins"
+slack.room = "replaceSlackRoom"
+slack.save()
+
 //Docker Configuration
 JSONObject docker_settings = new JSONObject()
 docker_settings.putAll([
   name: 'docker-build-server',
-  serverUrl: 'replaceServerUrl',
+  serverUrl: 'http://replaceDockerIP:79800',
   containerCapStr: '5',
   connectionTimeout: 5,
   readTimeout: 15,

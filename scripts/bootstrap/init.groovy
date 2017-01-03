@@ -10,8 +10,20 @@ import com.cloudbees.plugins.credentials.SystemCredentialsProvider
 
 def instance = Jenkins.getInstance()
 
+println "--> creating local user 'admin'"
+
+// Create New Admin User
+def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+hudsonRealm.createAccount('replaceAdminUser','replaceAdminPassword')
+instance.setSecurityRealm(hudsonRealm)
+
+// Remove initial admin to Replace non-standard admin user
+User oldadmin = User.get('admin')
+oldadmin.delete()
+
+// Set New Admin Permissions and view Permissions
 permissions = new hudson.security.GlobalMatrixAuthorizationStrategy()
-permissions.add(Jenkins.ADMINISTER, 'admin')
+permissions.add(Jenkins.ADMINISTER, 'replaceAdminUser')
 permissions.add(hudson.model.View.READ, 'anonymous')
 permissions.add(hudson.model.Item.READ, 'anonymous')
 permissions.add(Jenkins.READ, 'anonymous')
@@ -20,10 +32,10 @@ instance.authorizationStrategy = permissions
 
 instance.save()
 
-pm = instance.pluginManager
-uc = instance.updateCenter
+pluginManager = instance.pluginManager
+updateCenter = instance.updateCenter
 
-pm.plugins.each { plugin ->
+pluginManager.plugins.each { plugin ->
   plugin.disable()
 }
 
@@ -35,7 +47,7 @@ def activatePlugin(plugin) {
   }
 
   plugin.getDependencies().each {
-    activatePlugin(pm.getPlugin(it.shortName))
+    activatePlugin(pluginManager.getPlugin(it.shortName))
   }
 }
 
@@ -75,11 +87,11 @@ def activatePlugin(plugin) {
   "github",
   "ghprb"
 ].each {
-  if (! pm.getPlugin(it)) {
-    deployment = uc.getPlugin(it).deploy(true)
+  if (! pluginManager.getPlugin(it)) {
+    deployment = updateCenter.getPlugin(it).deploy(true)
     deployment.get()
   }
-  activatePlugin(pm.getPlugin(it))
+  activatePlugin(pluginManager.getPlugin(it))
 }
 
 if (deployed) {
