@@ -109,6 +109,12 @@ Installed via [sumologic.sh](scripts/bootstrap/sumologic.sh)
 
 **NOTE:** Be sure to merge the latest from "upstream" before making a pull request!
 
+## Credits
+A lot of the work/ideas on this came from researching the following projects.
+-   [Jenkins-Bootstrap-Jervis](https://github.com/samrocketman/jenkins-bootstrap-jervis)
+-   [Jenkins-Groovy-Examples](https://github.com/glenjamin/jenkins-groovy-examples)
+-   [Collection of Jenkins Groovy Scripts](https://gist.github.com/dnozay/e7afcf7a7dd8f73a4e05)
+
 ## License
 Copyright 2016-2017, Hearst Automation Team
 
