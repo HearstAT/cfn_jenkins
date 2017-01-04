@@ -22,7 +22,7 @@ githubWebUri = 'https://github.com'
 githubApiUri = 'https://api.github.com'
 clientID = 'replaceClientID'
 clientSecret = 'replaceClientSecret'
-oauthScopes = 'read:org'
+oauthScopes = 'read:org,user:email'
 SecurityRealm github_realm = new GithubSecurityRealm(githubWebUri, githubApiUri, clientID, clientSecret, oauthScopes)
 //check for equality, no need to modify the runtime if no settings changed
 if(!github_realm.equals(instance.getSecurityRealm())) {

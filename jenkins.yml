@@ -90,7 +90,7 @@ Parameters:
 ###############################################################################
 # Plugins Configuration
 ###############################################################################
-  GithubEmail:
+  GitEmail:
     Type: String
     Default: ''
     Description: Enter Github Commit Email
@@ -134,7 +134,36 @@ Parameters:
     Description: Enter Slack Token
 
 ###############################################################################
-# Jenkins Build Configuration
+# Plugins Configuration
+###############################################################################
+  AdminEmail:
+    Type: String
+    Default: ''
+    Description: Enter Email Address for Jenkins to send emails as
+
+  MailUser:
+    Type: String
+    Default: ''
+    Description: Enter SMTP Service User
+
+  MailPassword:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter SMTP Service User
+
+  MailHost:
+    Type: String
+    Default: ''
+    Description: Enter SMTP Host (e.g.; smtp.mailgun.org)
+
+  MailPort:
+    Type: String
+    Default: ''
+    Description: Enter SMTP Host
+
+###############################################################################
+# Jenkins Build Host Configuration
 ###############################################################################
   DockerVersion:
     Type: String
@@ -255,7 +284,7 @@ Metadata:
       Parameters:
         - GithubAdmins
         - GithubOrg
-        - GithubEmail
+        - GitEmail
         - GithubClientID
         - GithubClientSecret
         - SlackTeam
@@ -263,7 +292,16 @@ Metadata:
         - SlackToken
     -
       Label:
-        default: Jenkins Build Configuration
+        default: Mail Configuration
+      Parameters:
+        - AdminEmail
+        - MailUser
+        - MailPassword
+        - MailHost
+        - MailPort
+    -
+      Label:
+        default: Jenkins Build Host Configuration
       Parameters:
         - BuildInstanceType
         - DockerVersion
@@ -654,18 +692,26 @@ Resources:
               fi
 
               ## Swap Placeholders with Params
+              ### Init Script
               sed -i 's/replaceAdminUser/${AdminUsername}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
               sed -i 's/replaceAdminPassword/${AdminPassword}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
+              ### Bootstrap Script
               sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceGitEmail/${GithubEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
               sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              ### Mail Config
+              sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/cfn_jenkins/scripts/init/mail.groovy
+              sed -i 's/replaceMailUser/${MailUser}/g' /root/cfn_jenkins/scripts/init/mail.groovy
+              sed -i 's/replaceMailPassword/${MailPassword}/g' /root/cfn_jenkins/scripts/init/mail.groovy
+              sed -i 's/replaceMailHost/${MailHost}/g' /root/cfn_jenkins/scripts/init/mail.groovy
+              sed -i 's/replaceMailPort/${MailPort}/g' /root/cfn_jenkins/scripts/init/mail.groovy
 
               mkdir -p /var/lib/jenkins/init.groovy.d || error_exit "Failed to Groovy Init Directory"
               cp -rf /root/cfn_jenkins/scripts/init /var/lib/jenkins/init.groovy.d || error_exit "Failed to copy groovy init scripts"

@@ -8,7 +8,7 @@ Our Jenkins configuration
 -   Uses Groovy Scripts to Configure Jenkins, Credentials, and Plugins
 
 ## Diagram
--   [ ] Create diagram for build out
+![Alt text](Jenkins_Build_Out.png?raw=true "Overview Diagram")
 
 ## Requirements
 -   Existing VPC
@@ -22,7 +22,50 @@ Our Jenkins configuration
 ### Getting Started
 
 #### Params and Options
--   [ ] Add params and where to find info
+-   Domain Configuration
+    -   HostedZone; A Domain Setup in Route53 [Guide](http://docs.aws.amazon.com/Route53/latest/DeveloperGuide/CreatingHostedZone.html)
+    -   SSLCertificateARN; See the [SSL Setup](#ssl-setup) Section  
+-   Redeploy/Existing Install Configuration
+    -   ExistingBucketName; See [Restore/Backup Options](#restorebackup-options) Section for more info
+-   Jenkins Configuration
+    -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
+    -   JenkinsSubdomain; Choose subdomain to create in
+    -   JenkinsVersion; Select which version of Jenkins you want to install (>= 2.x Only Available)
+    -   AdminUsername; Enter a username to use for local admin; replaces the temporary admin that's created during setup
+    -   AdminPassword; Enter password for new local admin
+    -   JenkinsLogLevel; Select which log level you want Jenkins to log at
+-   Plugins Configuration
+    -   GitEmail; [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin): Enter Git Commit email
+    -   GithubAdmins; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Enter a comma delimited list of Github Usernames to act as Jenkins Admins (i.e.; octobob, turkeydaniels, catarang)
+    -   GithubOrg; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Enter Organization to use for Jenkins Authorization
+    -   GithubClientID; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Github Auth Integration ClientID
+    -   GithubClientSecret; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Github Auth Integration Client Secret
+    -   SlackTeam; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Slack Team to Connect To
+    -   SlackRoom; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Default Slack Room to Post to
+    -   SlackToken; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Jenkins-CI Integration Token from Slack
+-   Mail Configuration
+    -   AdminEmail; Email Address to Jenkins email from
+    -   MailUser; admin
+    -   MailPassword; password
+    -   MailHost; Such as mailgun.org
+    -   MailPort; Mail server port
+-   Jenkins Build Host Configuration
+    -   BuildInstanceType; Select instance size for Docker/Build Host
+    -   DockerVersion; Select version of Docker to install (>= 11.x)
+-   Network Configuration
+    -   KeyName; Select SSH Key
+    -   VPC; See [Requirements](#requirements) for more info
+    -   SSHSecurityGroup; See [Requirements](#requirements) for more info
+    -   CIDRA; See [Requirements](#requirements) for more info
+-   Sumologic Configuration (Optional)
+    -   SumologicAccessID; See [Sumologic](#sumologic) for more info
+    -   SumologicAccessKey; See [Sumologic](#sumologic) for more info
+-   NewRelic Configuration (Optional)
+    -   NewRelicAppName; See [NewRelic](#new-relic) for more info
+    -   NewRelicLicense; See [NewRelic](#new-relic) for more info
+-   Development Options
+    -   GitClone; See [Development/Forked/Custom Selections](#developmentforkedcustom-selections) for more info
+    -   GitBranch; See [Development/Forked/Custom Selections](#developmentforkedcustom-selections) for more info
 
 #### Optional Setup
 
@@ -30,14 +73,6 @@ Our Jenkins configuration
     -   **Important:**  If intending to do external knife ec backups, check this section before setting up.
 -   NewRelic Setup; See the [NewRelic](#new-relic) Section
 -   Sumologic Setup; See the [Sumologic](#sumologic) Section
-
-##### Mail Server Setup
-**WIP** Placeholder only
-
--   MailUsername; admin
--   MailPassword; password
--   MailHost; Such as mailgun.org
--   MailPort; Mail server port
 
 ##### Development/Forked/Custom Selections
 Options that don't need to be bothered with except in development situations.
@@ -65,7 +100,7 @@ You can also use the new [AWS Certificate Manager Service](http://docs.aws.amazo
     -   Data is synced to a S3 Bucket created at build time
 -   Restore
     -   Utilize an existing bucket to sync down any Jenkins Configuration and/or Secrets
-    -   Create a new Bucket and add a `jenkins` and `secrets` folder
+    -   If Creating a new Bucket manually, then add a `jenkins` and `secrets` folder to bucket before building
 
 ## New Relic
 We utilize New Relic as our System Monitor, this is setup only if conditions are met
