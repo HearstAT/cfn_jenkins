@@ -363,7 +363,6 @@ Resources:
 ###############################################################################
   JenkinsBucket:
     Type: AWS::S3::Bucket
-    # conditional look up, if true then creates this resource.
     Condition: JenkinsBucketCon
     DeletionPolicy: Retain
     Properties:
@@ -425,7 +424,7 @@ Resources:
       Roles:
         - !Ref InstanceRole
 
-  RolePolicies:
+  AdditionalBucketPolicies:
     Type: AWS::IAM::Policy
     Condition: AdditionalBucketCon
     Properties:
@@ -662,7 +661,7 @@ Resources:
               libxrender1 libxtst6 net-tools openjdk-8-jre-headless psmisc ucf x11-common
 
               ## User war download to control version
-              mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins || error_exit "Failed to create Jenkins directories"
+              mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to create Jenkins directories"
               wget "http://mirrors.jenkins.io/war-stable/${JenkinsVersion}/jenkins.war" -qO /usr/share/jenkins/jenkins.war || error_exit "Failed to download Jenkins war"
               chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to change Jenkins directory mode"
               chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to change Jenkins directory owner"

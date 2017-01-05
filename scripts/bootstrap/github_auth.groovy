@@ -6,7 +6,7 @@ import org.jenkinsci.plugins.GithubAuthorizationStrategy
 
 def instance = Jenkins.getInstance()
 
-println "--> creating local user 'Configuring Github Oauth'"
+println "--> Setting Up Github Oauth"
 
 //Github Auth Configuration
 githubWebUri = 'https://github.com'
@@ -23,15 +23,15 @@ if(!github_realm.equals(instance.getSecurityRealm())) {
 }
 
 //Set Github Users as Admins
-adminUserNames = 'replaceGithubAdmins'
+String adminUserNames = 'replaceGithubAdmins'
 //Participant in Organization
-organizationNames = 'replaceGithubOrg'
+String organizationNames = 'replaceGithubOrg'
 //Use Github repository permissions
 boolean useRepositoryPermissions = true
 //Grant READ permissions to all Authenticated Users
-boolean authenticatedUserReadPermission = false
+boolean authenticatedUserReadPermission = true
 //Grant CREATE Job permissions to all Authenticated Users
-boolean authenticatedUserCreateJobPermission = false
+boolean authenticatedUserCreateJobPermission = true
 //Grant READ permissions for /github-webhook
 boolean allowGithubWebHookPermission = true
 //Grant READ permissions for /cc.xml
