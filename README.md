@@ -31,8 +31,6 @@ Our Jenkins configuration
     -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
     -   JenkinsSubdomain; Choose subdomain to create in
     -   JenkinsVersion; Select which version of Jenkins you want to install (>= 2.x Only Available)
-    -   AdminUsername; Enter a username to use for local admin; replaces the temporary admin that's created during setup
-    -   AdminPassword; Enter password for new local admin
     -   JenkinsLogLevel; Select which log level you want Jenkins to log at
 -   Plugins Configuration
     -   GitEmail; [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin): Enter Git Commit email
