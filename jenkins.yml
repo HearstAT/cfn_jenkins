@@ -330,7 +330,7 @@ Conditions:
   JenkinsBucketCon:
     !Equals [ !Ref ExistingBucketName, '' ]
   AdditionalBucketCon:
-    !Equals [ !Ref AdditionalBucket, '' ]
+    !Not [ !Equals [ !Ref AdditionalBucket, '' ] ]
 
 Mappings:
   RegionMap:
