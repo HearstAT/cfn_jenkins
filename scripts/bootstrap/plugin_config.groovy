@@ -1,8 +1,6 @@
 import jenkins.*
 import jenkins.model.*
 import hudson.security.*
-import org.jenkinsci.plugins.GithubSecurityRealm
-import org.jenkinsci.plugins.GithubAuthorizationStrategy
 import com.cloudbees.plugins.credentials.*
 import com.nirima.jenkins.plugins.docker.DockerCloud
 import com.nirima.jenkins.plugins.docker.DockerTemplate
@@ -12,122 +10,13 @@ import org.kohsuke.stapler.StaplerRequest
 
 // Variable Set
 instance = Jenkins.getInstance()
-jenkinsLocationConfiguration = JenkinsLocationConfiguration.get()
 git_desc = instance.getDescriptor("hudson.plugins.git.GitSCM")
-domain = Domain.global()
-store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
-
-//Github Auth Configuration
-githubWebUri = 'https://github.com'
-githubApiUri = 'https://api.github.com'
-clientID = 'replaceClientID'
-clientSecret = 'replaceClientSecret'
-oauthScopes = 'read:org,user:email'
-SecurityRealm github_realm = new GithubSecurityRealm(githubWebUri, githubApiUri, clientID, clientSecret, oauthScopes)
-//check for equality, no need to modify the runtime if no settings changed
-if(!github_realm.equals(instance.getSecurityRealm())) {
-  println "Saving Github Security Realm Configuration"
-  instance.setSecurityRealm(github_realm)
-  instance.save()
-}
-
-//Set Github Users as Admins
-adminUserNames = 'replaceGithubAdmins'
-//Participant in Organization
-organizationNames = 'replaceGithubOrg'
-//Use Github repository permissions
-boolean useRepositoryPermissions = true
-//Grant READ permissions to all Authenticated Users
-boolean authenticatedUserReadPermission = false
-//Grant CREATE Job permissions to all Authenticated Users
-boolean authenticatedUserCreateJobPermission = false
-//Grant READ permissions for /github-webhook
-boolean allowGithubWebHookPermission = true
-//Grant READ permissions for /cc.xml
-boolean allowCcTrayPermission = false
-//Grant READ permissions for Anonymous Users
-boolean allowAnonymousReadPermission = false
-//Grant ViewStatus permissions for Anonymous Users
-boolean allowAnonymousJobStatusPermission = false
-
-AuthorizationStrategy github_authorization = new GithubAuthorizationStrategy(adminUserNames,
-    authenticatedUserReadPermission,
-    useRepositoryPermissions,
-    authenticatedUserCreateJobPermission,
-    organizationNames,
-    allowGithubWebHookPermission,
-    allowCcTrayPermission,
-    allowAnonymousReadPermission,
-    allowAnonymousJobStatusPermission)
-
-//check for equality, no need to modify the runtime if no settings changed
-if(!github_authorization.equals(instance.getAuthorizationStrategy())) {
-  println "Saving Github Auth Configuration"
-  instance.setAuthorizationStrategy(github_authorization)
-  instance.save()
-}
 
 //Git Configuration
 git_desc.setGlobalConfigName("Jenkins")
 git_desc.setGlobalConfigEmail("replaceGitEmail")
 
 git_desc.save()
-
-//Disable CLI access over /cli URL
-def removal = { lst ->
-    lst.each { x ->
-        if(x.getClass().name.contains("CLIAction")) {
-            lst.remove(x)
-        }
-    }
-}
-
-removal(instance.getExtensionList(RootAction.class))
-removal(instance.actions)
-
-//Privacy Configuration
-if(Jenkins.instance.isUsageStatisticsCollected()) {
-    println "Disabling anonymous usage statistics"
-    Jenkins.instance.setNoUsageStatistics(true)
-    hasConfigBeenUpdated = true
-}
-
-//Configure Credentials
-SystemCredentialsProvider system_creds = SystemCredentialsProvider.getInstance()
-Boolean foundDocker=false
-Boolean foundSlack=false
-
-system_creds.getCredentials().each{
-    if('jenkins-docker-server'.equals(it.getId())) {
-        foundDocker=true
-    }
-}
-if(!foundDocker) {
-    Map<Domain, List<Credentials>> domainCredentialsMap = system_creds.getDomainCredentialsMap()
-    UsernamePasswordCredentialsImpl creds =
-        new UsernamePasswordCredentialsImpl(CredentialsScope.SYSTEM,
-                                            'jenkins-docker-server',
-                                            'Jenkins slave docker container credentials.',
-                                            'jenkins',
-                                            'jenkins')
-    domainCredentialsMap[Domain.global()].add(creds)
-    system_creds.save()
-    println 'Added docker cloud credentials.'
-}
-
-system_creds.getCredentials().each{
-    if('slack-integration-token'.equals(it.getId())) {
-        foundSlack=true
-    }
-}
-if(!foundSlack) {
-  secretText = new StringCredentialsImpl(CredentialsScope.GLOBAL,
-                                         'slack-integration-token',
-                                         'Slack Integration Token',
-                                         Secret.fromString("replaceSlackToken"))
-    store.addCredentials(domain, secretText)
-    println 'Added slack token'
-}
 
 //Slack Configuration
 def slack = jenkins.getDescriptorByType(jenkins.plugins.slack.SlackNotifier.DescriptorImpl)

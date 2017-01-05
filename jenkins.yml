@@ -51,17 +51,6 @@ Parameters:
       - "2.7.1"
     Description: Choose Jenkins Version to Install
 
-  AdminUsername:
-    Type: String
-    Default: ''
-    Description: Enter Username for Jenkins Local Admin
-
-  AdminPassword:
-    Type: String
-    NoEcho: 'true'
-    Default: ''
-    Description: Enter Password for Jenkins Admin
-
   JenkinsLogLevel:
     Type: String
     Default: "INFO"
@@ -275,8 +264,6 @@ Metadata:
         - MasterInstanceType
         - JenkinsSubdomain
         - JenkinsVersion
-        - AdminUsername
-        - AdminPassword
         - JenkinsLogLevel
     -
       Label:
@@ -700,20 +687,19 @@ Resources:
               fi
 
               ## Swap Placeholders with Params
-              ### Init Script
-              sed -i 's/replaceAdminUser/${AdminUsername}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
-              sed -i 's/replaceAdminPassword/${AdminPassword}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
-              ### Bootstrap Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
-              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              ### Github Oauth Config Script
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/auth/github_auth.groovy
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
+              ### Credentials Config Script
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/credentials.groovy
+              ### Plugin Config Script
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
               ### Mail Config
               sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/cfn_jenkins/scripts/init/mail.groovy
               sed -i 's/replaceMailUser/${MailUser}/g' /root/cfn_jenkins/scripts/init/mail.groovy
@@ -726,12 +712,19 @@ Resources:
 
               systemctl start jenkins || error_exit "Failed to start Jenkins"
 
-              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/init.groovy)" https://${JenkinsSubdomain}.${HostedZone} || error_exit "Failed to Run init Groovy Script"
+              INITIALPASSWORD=$(cat /var/lib/jenkins/secrets/initialAdminPassword)
 
               systemctl restart jenkins || error_exit "Failed to restart Jenkins"
 
-              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy)" https://${JenkinsSubdomain}.${HostedZone} || error_exit "Failed to run Groovy bootstrap Script"
+              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+                printf '.'
+                sleep 5
+              done
 
+              crumb=`curl "admin:${!INITIALPASSWORD}@127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/credentials.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Credentials Config"
+              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
+              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/github_auth.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Github Oauth Config"
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
               cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
@@ -742,8 +735,6 @@ Resources:
               ${JenkinsVersion}
               EOF
 
-              systemctl start jenkins || error_exit "Failed to start Jenkins"
-
               aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --include "*.xml" --include "*.key" --include "secrets/*"
 
               mkdir -p /var/lib/jenkins/data || error_exit "Failed to create Jenkins data directory"
@@ -753,6 +744,11 @@ Resources:
               jenkins.level=${JenkinsLogLevel}
               java.util.logging.ConsoleHandler.level=${JenkinsLogLevel}
               EOF
+
+              chmod -R 755 /var/lib/jenkins || error_exit "Failed to change Jenkins directory mode"
+              chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Failed to change Jenkins directory owner"
+
+              systemctl start jenkins || error_exit "Failed to start Jenkins"
 
               ##########################################################
               # NewRelic Config if Enabled

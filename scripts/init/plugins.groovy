@@ -1,36 +1,9 @@
 import jenkins.model.*
 import hudson.security.*
-import org.jenkinsci.plugins.GithubSecurityRealm
-import org.jenkinsci.plugins.GithubAuthorizationStrategy
-import com.cloudbees.plugins.credentials.Credentials
-import com.cloudbees.plugins.credentials.CredentialsScope
-import com.cloudbees.plugins.credentials.domains.Domain
-import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl
-import com.cloudbees.plugins.credentials.SystemCredentialsProvider
 
 def instance = Jenkins.getInstance()
 
-println "--> creating local user 'admin'"
-
-// Create New Admin User
-def hudsonRealm = new HudsonPrivateSecurityRealm(false)
-hudsonRealm.createAccount('replaceAdminUser','replaceAdminPassword')
-instance.setSecurityRealm(hudsonRealm)
-
-// Remove initial admin to Replace non-standard admin user
-User oldadmin = User.get('admin')
-oldadmin.delete()
-
-// Set New Admin Permissions and view Permissions
-permissions = new hudson.security.GlobalMatrixAuthorizationStrategy()
-permissions.add(Jenkins.ADMINISTER, 'replaceAdminUser')
-permissions.add(hudson.model.View.READ, 'anonymous')
-permissions.add(hudson.model.Item.READ, 'anonymous')
-permissions.add(Jenkins.READ, 'anonymous')
-
-instance.authorizationStrategy = permissions
-
-instance.save()
+println "--> Installing and Updating Plugins"
 
 pluginManager = instance.pluginManager
 updateCenter = instance.updateCenter
