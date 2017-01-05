@@ -141,7 +141,7 @@ slack.save()
 JSONObject docker_settings = new JSONObject()
 docker_settings.putAll([
   name: 'docker-build-server',
-  serverUrl: 'http://replaceDockerIP:79800',
+  serverUrl: 'http://replaceDockerIP:9800',
   containerCapStr: '5',
   connectionTimeout: 5,
   readTimeout: 15,

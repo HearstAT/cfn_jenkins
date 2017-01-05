@@ -437,10 +437,6 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
           FromPort: '443'
           ToPort: '443'
           CidrIp: 0.0.0.0/0
@@ -460,8 +456,8 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
+          FromPort: '8080'
+          ToPort: '8080'
           SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
         - IpProtocol: tcp
           FromPort: '0'
@@ -478,7 +474,7 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: Server-Security-Group
+          Value: Jenkins-Master-Security-Group
 
   BuildSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -501,7 +497,7 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: Server-Security-Group
+          Value: Jenkins-Build-Security-Group
 
 ###############################################################################
 # Load Balancer (For SSL) and DNS
@@ -512,16 +508,20 @@ Resources:
       HealthCheck:
         HealthyThreshold: '2'
         Interval: '90'
-        Target: HTTP:80/login
+        Target: HTTP:8080/login
         Timeout: '60'
         UnhealthyThreshold: '10'
+      Instances:
+        - !Ref MasterInstance
+      Subnets:
+        - !Ref SubnetA
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       LBCookieStickinessPolicy:
         - PolicyName: PublicELBCookieStickinessPolicy
           CookieExpirationPeriod: '3600'
       Listeners:
-        - InstancePort: '80'
+        - InstancePort: '8080'
           LoadBalancerPort: '443'
           InstanceProtocol: HTTP
           Protocol: HTTPS
@@ -535,9 +535,10 @@ Resources:
   JenkinsDNS:
     Type: AWS::Route53::RecordSetGroup
     Properties:
+      HostedZoneName: !Sub "${HostedZone}."
       Comment: !Sub Zone apex alias targeted to ${JenkinsSubdomain} ELB.
       RecordSets:
-        - Name: !Join [ '', [ !Ref JenkinsSubdomain, ".", !Ref HostedZone, "." ] ]
+        - Name: !Sub "${JenkinsSubdomain}.${HostedZone}."
           Type: A
           AliasTarget:
             HostedZoneId: !GetAtt ElasticLoadBalancer.CanonicalHostedZoneNameID
@@ -597,6 +598,11 @@ Resources:
                   easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
               fi
 
+              if [ -z $(command -v aws) ]; then
+                sleep 5
+                pip install awscli
+              fi
+
               ##########################################################
               # Helper function to set wait timer
               ##########################################################
@@ -633,10 +639,10 @@ Resources:
 
               ## Dependencies
               apt-get install -y ca-certificates-java daemon dbus default-jre-headless \
-              fontconfig-config fonts-dejavu-core java-common jenkins libavahi-client3 \
+              fontconfig-config fonts-dejavu-core java-common libavahi-client3 libxi6 \
               libavahi-common-data libavahi-common3 libcap-ng0 libcups2 libdbus-1-3 libexpat1 \
               libfontconfig1 libfreetype6 libjpeg-turbo8 libjpeg8 liblcms2-2 libnspr4 libnss3 \
-              libnss3-nssdb libpcsclite1 libpng12-0 libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 libxext6 libxi6 \
+              libnss3-nssdb libpcsclite1 libpng12-0 libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 libxext6 \
               libxrender1 libxtst6 net-tools openjdk-8-jre-headless psmisc ucf x11-common
 
               ## User war download to control version
@@ -654,18 +660,20 @@ Resources:
               [Unit]
               Description=jenkins
               After=network.target
-              Requires=network.target
 
               [Service]
               Type=simple
               User=jenkins
               Group=jenkins
               Environment=JENKINS_HOME=/var/lib/jenkins
-              PIDFile=/var/run/jenkins/jenkins.pid
               ExecStartPre=/bin/rm -f /var/run/jenkins/jenkins.pid
-              ExecStart=/usr/bin/java -Djava.awt.headless=true -jar /usr/share/jenkins/jenkins.war --httpPort=80 --httpListenAddress=127.0.0.1
+              ExecStart=/usr/bin/java -Djava.awt.headless=true -jar /usr/share/jenkins/jenkins.war --httpPort=8080 --httpListenAddress=127.0.0.1
+              ExecReload=/bin/kill -s HUP $MAINPID
+              TimeoutStartSec=0
               Restart=always
               RestartSec=20
+              Delegate=yes
+              KillMode=process
 
               [Install]
               WantedBy=multi-user.target
@@ -696,16 +704,16 @@ Resources:
               sed -i 's/replaceAdminUser/${AdminUsername}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
               sed -i 's/replaceAdminPassword/${AdminPassword}/g' /root/cfn_jenkins/scripts/bootstrap/init.groovy
               ### Bootstrap Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
-              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy
               ### Mail Config
               sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/cfn_jenkins/scripts/init/mail.groovy
               sed -i 's/replaceMailUser/${MailUser}/g' /root/cfn_jenkins/scripts/init/mail.groovy
@@ -722,7 +730,7 @@ Resources:
 
               systemctl restart jenkins || error_exit "Failed to restart Jenkins"
 
-              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/bootsrap.groovy)" https://${JenkinsSubdomain}.${HostedZone} || error_exit "Failed to run Groovy bootstrap Script"
+              curl --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/bootstrap.groovy)" https://${JenkinsSubdomain}.${HostedZone} || error_exit "Failed to run Groovy bootstrap Script"
 
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
@@ -780,7 +788,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub Jenkins-Master-${AWS::StackName}
-          PropagateAtLaunch: true
 
   MasterEIPAssign:
     Type: "AWS::EC2::EIPAssociation"
@@ -830,11 +837,6 @@ Resources:
             export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             export STACKNAME='${AWS::StackName}'
             export HOSTNAME="${JenkinsSubdomain}-build-${!INSTANCE_ID}.${HostedZone}"
-            if [ "${DockerVersion}" >= '1.12.4' ]; then
-              export DOCKERVERSION='${DockerVersion}-0~ubuntu-xenial'
-            else
-              export DOCKERVERSION='${DockerVersion}-0~xenial'
-            fi
 
             ##########################################################
             # Install cfn bootstraping tools
@@ -875,17 +877,37 @@ Resources:
             apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D || error_exit "Failed to add APT Repo Key"
             apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' || error_exit "Failed to add Repo List"
 
-            apt-get update && apt-get install docker-engine=${!DOCKERVERSION} || error_exit "Failed to Install Docker Engine"
+            apt-get update && apt-get install docker-engine=${DockerVersion}-0* || error_exit "Failed to Install Docker Engine"
 
             ##########################################################
             # Docker Setup
             ##########################################################
 
-            cat > '/etc/default/docker' << 'EOF'
-            DOCKER="/usr/bin/docker"
+            cat > '/lib/systemd/system/docker.service' << 'EOF'
+            [Unit]
+            Description=Docker Application Container Engine
+            Documentation=https://docs.docker.com
+            After=network.target docker.socket
+            Requires=docker.socket
 
-            DOCKER_OPTS="-H tcp://127.0.0.1:79800 -H unix:///var/run/docker.sock --pidfile=/var/run/docker.pid --tlsverify=false"
+            [Service]
+            Type=notify
+            ExecStart=/usr/bin/dockerd -H tcp://127.0.0.1:9800 -H unix:///var/run/docker.sock --pidfile=/var/run/docker.pid --tlsverify=false
+            ExecReload=/bin/kill -s HUP $MAINPID
+            LimitNOFILE=infinity
+            LimitNPROC=infinity
+            LimitCORE=infinity
+            TasksMax=infinity
+            TimeoutStartSec=0
+            Delegate=yes
+            KillMode=process
+
+            [Install]
+            WantedBy=multi-user.target
             EOF
+
+            systemctl daemon-reload || error_exit "Failed to reload Docker Daemon Changes"
+            systemctl restart docker || error_exit "Failed to restart Docker Daemon"
 
             ##########################################################
             # NewRelic Config if Enabled
@@ -919,7 +941,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub Jenkins-Build-Server-${AWS::StackName}
-          PropagateAtLaunch: true
 
   MasterWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
