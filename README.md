@@ -27,6 +27,10 @@ Our Jenkins configuration
     -   SSLCertificateARN; See the [SSL Setup](#ssl-setup) Section  
 -   Redeploy/Existing Install Configuration
     -   ExistingBucketName; See [Restore/Backup Options](#restorebackup-options) Section for more info
+    -   RestoreBackup; See [Restore/Backup Options](#restorebackup-options) Section for more info
+    -   GHAdminCreds; Enter you Github Username and [Personal Access Token](https://github.com/settings/tokens) in this format `ghuser:token`
+        -   See [Restore/Backup Options](#restorebackup-options) Section for more info
+    -   AdditionalBucket; Add access to another S3 bucket via IAM Profile
 -   Jenkins Configuration
     -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
     -   JenkinsSubdomain; Choose subdomain to create in
@@ -97,8 +101,8 @@ You can also use the new [AWS Certificate Manager Service](http://docs.aws.amazo
 -   Backup
     -   Data is synced to a S3 Bucket created at build time
 -   Restore
-    -   Utilize an existing bucket to sync down any Jenkins Configuration and/or Secrets
-    -   If Creating a new Bucket manually, then add a `jenkins` and `secrets` folder to bucket before building
+    -   Enter existing bucket name and set restore backup to true, will sync previously backed up data during build
+    -   **Important** If having the Github Oauth Previously Configured, you will need a [Personal Access Token](https://github.com/settings/tokens) so the build process can run scripts against Jenkins
 
 ## New Relic
 We utilize New Relic as our System Monitor, this is setup only if conditions are met

@@ -24,6 +24,14 @@ Parameters:
     Default: ''
     Description: Enter a Existing Bucket Name to to use (Leave blank to create new)
 
+  RestoreBackup:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Choose to sync backup from Existing Bucket (Optional)
+
   AdditionalBucket:
     Type: String
     Default: ''
@@ -262,6 +270,7 @@ Metadata:
         default: Redeploy/Existing Install Configuration
       Parameters:
         - ExistingBucketName
+        - RestoreBackup
         - AdditionalBucket
     -
       Label:
@@ -496,7 +505,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: '0'
           ToPort: '65535'
-          CidrIp: !Sub "${MasterEIP}/32"
+          CidrIp: !Ref CIDRA
         - IpProtocol: tcp
           FromPort: '22'
           ToPort: '22'
@@ -658,13 +667,13 @@ Resources:
               libavahi-common-data libavahi-common3 libcap-ng0 libcups2 libdbus-1-3 libexpat1 \
               libfontconfig1 libfreetype6 libjpeg-turbo8 libjpeg8 liblcms2-2 libnspr4 libnss3 \
               libnss3-nssdb libpcsclite1 libpng12-0 libx11-6 libx11-data libxau6 libxcb1 libxdmcp6 libxext6 \
-              libxrender1 libxtst6 net-tools openjdk-8-jre-headless psmisc ucf x11-common
+              libxrender1 libxtst6 net-tools openjdk-8-jre-headless psmisc ucf x11-common || error_exit "Jenkins Install: Failed to install dependencies"
 
               ## User war download to control version
-              mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to create Jenkins directories"
-              wget "http://mirrors.jenkins.io/war-stable/${JenkinsVersion}/jenkins.war" -qO /usr/share/jenkins/jenkins.war || error_exit "Failed to download Jenkins war"
-              chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to change Jenkins directory mode"
-              chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Failed to change Jenkins directory owner"
+              mkdir -p /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to create Jenkins directories"
+              wget "http://mirrors.jenkins.io/war-stable/${JenkinsVersion}/jenkins.war" -qO /usr/share/jenkins/jenkins.war || error_exit "Jenkins Install: Failed to download Jenkins war"
+              chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory mode"
+              chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory owner"
 
               ##########################################################
               # Jenkins Log & Service Configuration
@@ -694,53 +703,49 @@ Resources:
               WantedBy=multi-user.target
               EOF
 
-              systemctl enable jenkins || error_exit "Failed to enable Jenkins"
+              systemctl enable jenkins || error_exit "Jenkins Install: Failed to enable Jenkins"
 
               ##########################################################
               # Clone Script Repo
               ##########################################################
 
               if [ ! -d "/root/${!GITREPO%.*}" ]; then
-                cd /root && git clone ${!GITCLONE} || error_exit "Failed to Clone Scripts from Repo"
+                cd /root && git clone ${!GITCLONE} || error_exit "Get Groovy Scripts: Failed to Clone Scripts from Repo"
               else
-                cd /root/${!GITREPO%.*} && git pull
+                cd /root/${!GITREPO%.*} && git pull || error_exit "Get Groovy Scripts: Failed pull updates"
               fi
 
               if [ '${GitBranch}' != 'master' ]; then
-                git checkout ${GitBranch} || error_exit "Failed to switch branches"
+                cd /root/${!GITREPO%.*} && git checkout ${GitBranch} || error_exit "Get Groovy Scripts: Failed to switch to ${GitBranch} branch"
               fi
 
               ##########################################################
               # Jenkins Sync & Bootstrap
               ##########################################################
 
-              if [ -n ${ExistingBucketName} ]; then
-                aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Failed to sync existing data"
-              fi
-
               ## Swap Placeholders with Params
               ### Github Oauth Config Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               ### Credentials Config Script
-              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/credentials.groovy
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Credential Params"
               ### Git Config Script
-              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/git.groovy
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/git.groovy || error_exit "Groovy Bootstrap: Failed to replace Git Params"
               ### Slack Config Script
-              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
-              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
               ### Docker Config Script
-              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/docker.groovy
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy || error_exit "Groovy Bootstrap: Failed to replace Docker Params"
               ### Mail Config
-              sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
-              sed -i 's/replaceMailUser/${MailUser}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
-              sed -i 's/replaceMailPassword/${MailPassword}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
-              sed -i 's/replaceMailHost/${MailHost}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
-              sed -i 's/replaceMailPort/${MailPort}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
+              sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailUser/${MailUser}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailPassword/${MailPassword}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
 
-              systemctl start jenkins || error_exit "Failed to start Jenkins"
+              systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
 
               until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
                 printf '.'
@@ -748,24 +753,43 @@ Resources:
               done
 
               INITIALPASSWORD=$(cat /var/lib/jenkins/secrets/initialAdminPassword)
+              ADMINCREDS='admin:${!INITIALPASSWORD}'
 
-              systemctl restart jenkins || error_exit "Failed to restart Jenkins"
+              systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins"
 
               until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
                 printf '.'
                 sleep 5
               done
 
-              crumb=`curl "admin:${!INITIALPASSWORD}@127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/plugins.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugins Install"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/executors.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Executors Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/security.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Security Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/mail.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Mail Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/credentials.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Credentials Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/slack.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/git.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/docker.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/github_auth.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Github Oauth Config"
+              crumb=`curl --user ${!ADMINCREDS} "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
+              ## Pull In Backup Data
+              if [ -n ${ExistingBucketName} ] && [ ${RestoreBackup} == 'true' ]; then
+                aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
+                chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/enkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory mode"
+                chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory owner"
+                if [ -n '${GHAdminCreds}' ]; then
+                  unset $ADMINCREDS
+                  ADMINCREDS='${GHAdminCreds}'
+                fi
+              fi
+
+              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+                printf '.'
+                sleep 5
+              done
+
+              crumb=`curl --user ${!ADMINCREDS}  "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/executors.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Executors Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/security.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Security Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Mail Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Credentials Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/git.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
               cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
@@ -776,9 +800,9 @@ Resources:
               ${JenkinsVersion}
               EOF
 
-              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --exclude "*/" --exclude ".jenkins" --include "*.xml" --include "*.key" --include "secrets/*"
+              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --exclude "*/*" --exclude ".jenkins" --include "*.xml" --include "*.key" --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
 
-              mkdir -p /var/lib/jenkins/data || error_exit "Failed to create Jenkins data directory"
+              mkdir -p /var/lib/jenkins/data || error_exit "Jenkins Bootstrap: Failed to create Jenkins data directory"
 
               cat > '/var/lib/jenkins/data/log.properties' << EOF
               handlers=java.util.logging.ConsoleHandler
@@ -786,17 +810,19 @@ Resources:
               java.util.logging.ConsoleHandler.level=${JenkinsLogLevel}
               EOF
 
-              chmod -R 755 /var/lib/jenkins || error_exit "Failed to change Jenkins directory mode"
-              chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Failed to change Jenkins directory owner"
+              cp -f /root/${!GITREPO%.*}/scripts/xml/* /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy XML files in place"
 
-              systemctl start jenkins || error_exit "Failed to start Jenkins"
+              chmod -R 755 /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory mode"
+              chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory owner"
+
+              systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
 
               ##########################################################
               # NewRelic Config if Enabled
               ##########################################################
 
               if [ -n "${NewRelicLicense}" ]; then
-                bash /root/cfn_jenkins/scripts/bootstrap/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+                bash /root/${!GITREPO%.*}/scripts/bootstrap/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
               fi
 
               ##########################################################
@@ -804,7 +830,7 @@ Resources:
               ##########################################################
 
               if [ -n "${SumologicAccessID}" ]; then
-                bash /root/cfn_jenkins/scripts/bootstrap/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
+                bash /root/${!GITREPO%.*}/scripts/bootstrap/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
               fi
 
               ##########################################################
@@ -930,7 +956,7 @@ Resources:
             [Service]
             Type=notify
             Environment=DOCKER_CONTENT_TRUST=0
-            ExecStart=/usr/bin/dockerd -H tcp://127.0.0.1:9800 -H unix:///var/run/docker.sock --pidfile=/var/run/docker.pid
+            ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:9800 -H unix:///var/run/docker.sock --pidfile=/var/run/docker.pid
             ExecReload=/bin/kill -s HUP $MAINPID
             LimitNOFILE=infinity
             LimitNPROC=infinity
