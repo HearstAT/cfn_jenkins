@@ -726,12 +726,13 @@ Resources:
               sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/cfn_jenkins/scripts/bootstrap/github_auth.groovy
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/credentials.groovy
-              ### Plugin Config Script
+              ### Git Config Script
               sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
-              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
-              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
-              sed -i 's/replaceDomain/${HostedZone}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
-              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              ### Slack Config Script
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
+              ### Docker Config Script
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/cfn_jenkins/scripts/bootstrap/docker.groovy
               ### Mail Config
               sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
               sed -i 's/replaceMailUser/${MailUser}/g' /root/cfn_jenkins/scripts/bootstrap/mail.groovy
@@ -761,7 +762,9 @@ Resources:
               curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/security.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Security Config"
               curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/mail.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Mail Config"
               curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/credentials.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Credentials Config"
-              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
+              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/slack.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
+              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/git.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
+              curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/docker.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Plugin Config"
               curl -H $crumb --data-urlencode "script=$(</root/cfn_jenkins/scripts/bootstrap/github_auth.groovy)" admin:${!INITIALPASSWORD}@127.0.0.1:8080/scriptText || error_exit "Failed to run Groovy Github Oauth Config"
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
