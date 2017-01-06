@@ -91,7 +91,7 @@ docker_settings =
                 bindPorts: '22',
                 bindAllPorts: false,
                 privileged: false,
-                tty: false,
+                tty: true,
                 macAddress: '',
                 // Docker Template
                 labelString: 'chef foodcritic',
