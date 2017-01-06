@@ -727,7 +727,7 @@ Resources:
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/cfn_jenkins/scripts/bootstrap/credentials.groovy
               ### Git Config Script
-              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/plugin_config.groovy
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/cfn_jenkins/scripts/bootstrap/git.groovy
               ### Slack Config Script
               sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
               sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/cfn_jenkins/scripts/bootstrap/slack.groovy
