@@ -127,6 +127,16 @@ Installed via [sumologic.sh](scripts/bootstrap/sumologic.sh)
         -   Jenkins Master: Configured log collections for Jenkins and System Logs
         -   Jenkins Build Host: Configured log collections for Docker and System Logs
 
+## Docker Images
+This setup pulls the following docker images, if you wish to expand on them please look at the base build image for basic settings.
+
+-   Base Build Image
+    -   [Dockerhub](https://hub.docker.com/r/hearstat/jenkins-build-base/)
+    -   [Github](https://github.com/HearstAT/docker-jenkins-build-base)
+-   Foodcritic (Chef Cookbook) Image
+    -   [Dockerhub](https://hub.docker.com/r/hearstat/jenkins-build-foodcritic/)
+    -   [Github](https://github.com/HearstAT/docker-jenkins-build-foodcritic)
+
 ## Contributing
 #### External Contributors
 -   Fork the repo on GitHub

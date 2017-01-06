@@ -22,7 +22,7 @@ docker_settings =
         templates: [
             [
                 // Docker Template Base
-                image: 'hearstat/jenkins-build-base',
+                image: 'hearstat/jenkins-build-base:debian',
                 dnsString: '',
                 network: '',
                 dockerCommand: '',
@@ -40,10 +40,64 @@ docker_settings =
                 tty: false,
                 macAddress: '',
                 // Docker Template
-                labelString: 'base docker',
+                labelString: 'base docker debian',
                 remoteFs: '',
                 remoteFsMapping: '',
-                instanceCapStr: '10',
+                instanceCapStr: '2',
+                // SSH Launcher
+                credentialsId: 'jenkins-docker-server'
+            ],
+            [
+                // Docker Template Base
+                image: 'hearstat/jenkins-build-base:alpine',
+                dnsString: '',
+                network: '',
+                dockerCommand: '',
+                volumesString: '',
+                volumesFromString: '',
+                environmentsString: '',
+                lxcConfString: '',
+                hostname: '',
+                memoryLimit: 0,
+                memorySwap: 0,
+                cpuShares: 0,
+                bindPorts: '22',
+                bindAllPorts: false,
+                privileged: false,
+                tty: false,
+                macAddress: '',
+                // Docker Template
+                labelString: 'base docker alpine',
+                remoteFs: '',
+                remoteFsMapping: '',
+                instanceCapStr: '2',
+                // SSH Launcher
+                credentialsId: 'jenkins-docker-server'
+            ],
+            [
+                // Docker Template Base
+                image: 'hearstat/jenkins-build-foodcritic',
+                dnsString: '',
+                network: '',
+                dockerCommand: '',
+                volumesString: '',
+                volumesFromString: '',
+                environmentsString: '',
+                lxcConfString: '',
+                hostname: '',
+                memoryLimit: 0,
+                memorySwap: 0,
+                cpuShares: 0,
+                bindPorts: '22',
+                bindAllPorts: false,
+                privileged: false,
+                tty: false,
+                macAddress: '',
+                // Docker Template
+                labelString: 'chef foodcritic',
+                remoteFs: '',
+                remoteFsMapping: '',
+                instanceCapStr: '2',
                 // SSH Launcher
                 credentialsId: 'jenkins-docker-server'
             ]

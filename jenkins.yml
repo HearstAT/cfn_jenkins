@@ -981,6 +981,14 @@ Resources:
             systemctl restart docker || error_exit "Failed to restart Docker Daemon"
 
             ##########################################################
+            # Docker Get Base Images
+            ##########################################################
+
+            docker pull hearstat/jenkins-build-base:debian || error_exit "Failed to pull Base Image: Debian"
+            docker pull hearstat/jenkins-build-base:alpine || error_exit "Failed to pull Base Image: Alpine"
+            docker pull hearstat/jenkins-build-foodcritic || error_exit "Failed to pull Image: Foodcritic"
+
+            ##########################################################
             # NewRelic Config if Enabled
             ##########################################################
 
