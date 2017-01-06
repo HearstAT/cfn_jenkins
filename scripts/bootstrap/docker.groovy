@@ -5,6 +5,8 @@ import com.nirima.jenkins.plugins.docker.*
 import com.nirima.jenkins.plugins.docker.launcher.*
 import com.nirima.jenkins.plugins.docker.strategy.*
 
+import hudson.plugins.sshslaves.SSHConnector
+
 def docker_settings = [:]
 docker_settings =
 [
@@ -85,7 +87,7 @@ docker_settings.each { cloud ->
         )
 
       def dockerComputerSSHLauncher = new DockerComputerSSHLauncher(
-          new hudson.plugins.sshslaves.SSHConnector(22, template.credentialsId, null, null, null, null, null )
+          new SSHConnector(22, template.credentialsId, null, null, null, null, null )
       )
 
       dockerTemplate.setLauncher(dockerComputerSSHLauncher)
