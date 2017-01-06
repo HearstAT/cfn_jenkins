@@ -32,6 +32,12 @@ Parameters:
       - 'false'
     Description: Choose to sync backup from Existing Bucket (Optional)
 
+  GHAdminCreds:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter you Github Username and Personal Access Token in this format `ghuser:token`
+
   AdditionalBucket:
     Type: String
     Default: ''
@@ -271,6 +277,7 @@ Metadata:
       Parameters:
         - ExistingBucketName
         - RestoreBackup
+        - GHAdminCreds
         - AdditionalBucket
     -
       Label:
