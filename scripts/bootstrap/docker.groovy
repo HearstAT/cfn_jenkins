@@ -9,10 +9,11 @@ def docker_settings = [:]
 docker_settings =
 [
     [
+        // Docker Cloud
         name: 'Docker-Build-Server',
         serverUrl: 'tcp://replaceDockerIP:9800',
         containerCapStr: '20',
-        connectionTimeout: 5,
+        connectTimeout: 5,
         readTimeout: 15,
         credentialsId: '',
         version: '',
@@ -103,8 +104,8 @@ docker_settings.each { cloud ->
                     templates,
                     cloud.serverUrl,
                     cloud.containerCapStr,
-                    cloud.connectTimeout ?: 15,
-                    cloud.readTimeout ?: 15,
+                    cloud.connectTimeout,
+                    cloud.readTimeout,
                     cloud.credentialsId,
                     cloud.version
     )
