@@ -759,8 +759,7 @@ Resources:
                 sleep 5
               done
 
-              INITIALPASSWORD=$(cat /var/lib/jenkins/secrets/initialAdminPassword)
-              ADMINCREDS='admin:${!INITIALPASSWORD}'
+              ADMINCREDS="admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
 
               systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins"
 
@@ -769,8 +768,8 @@ Resources:
                 sleep 5
               done
 
-              crumb=`curl --user ${!ADMINCREDS} "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
+              crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
               ## Pull In Backup Data
               if [ -n ${ExistingBucketName} ] && [ ${RestoreBackup} == 'true' ]; then
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
@@ -787,16 +786,16 @@ Resources:
                 sleep 5
               done
 
-              crumb=`curl --user ${!ADMINCREDS}  "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              crumb=`curl --user "${!ADMINCREDS}"  "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
 
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/executors.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Executors Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/security.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Security Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Mail Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Credentials Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/git.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user ${!ADMINCREDS} --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/executors.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Executors Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/security.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Security Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Mail Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Credentials Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/git.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
               cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
