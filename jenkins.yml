@@ -788,6 +788,7 @@ Resources:
 
               crumb=`curl --user "${!ADMINCREDS}"  "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
 
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/buildPort.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Build Port Config"
               curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/executors.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Executors Config"
               curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/security.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Security Config"
               curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Mail Config"
