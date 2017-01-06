@@ -9,8 +9,8 @@ def docker_settings = [:]
 docker_settings =
 [
     [
-        name: 'Docker-Cloud',
-        serverUrl: 'http://replaceDockerIP:9800',
+        name: 'Docker-Build-Server',
+        serverUrl: 'tcp://replaceDockerIP:9800',
         containerCapStr: '20',
         connectionTimeout: 5,
         readTimeout: 15,
@@ -18,31 +18,31 @@ docker_settings =
         version: '',
         templates: [
             [
+                // Docker Template Base
                 image: 'hearstat/jenkins-build-base',
-                labelString: 'base docker',
-                remoteFs: '',
-                credentialsId: 'jenkins-docker-server',
-                idleTerminationMinutes: '5',
-                sshLaunchTimeoutMinutes: '1',
-                jvmOptions: '',
-                javaPath: '',
+                dnsString: '',
+                network: '',
+                dockerCommand: '',
+                volumesString: '',
+                volumesFromString: '',
+                environmentsString: '',
+                lxcConfString: '',
+                hostname: '',
                 memoryLimit: 0,
                 memorySwap: 0,
                 cpuShares: 0,
-                prefixStartSlaveCmd: '',
-                suffixStartSlaveCmd: '',
-                instanceCapStr: '10',
-                dnsString: '',
-                dockerCommand: '',
-                lxcConfString: '',
-                environmentsString: '',
-                volumesString: '',
-                volumesFromString: '',
                 bindPorts: '22',
                 bindAllPorts: false,
                 privileged: false,
                 tty: false,
-                macAddress: ''
+                macAddress: '',
+                // Docker Template
+                labelString: 'base docker',
+                remoteFs: '',
+                remoteFsMapping: '',
+                instanceCapStr: '10',
+                // SSH Launcher
+                credentialsId: 'jenkins-docker-server'
             ]
         ]
     ]
@@ -52,63 +52,64 @@ def dockerClouds = []
 docker_settings.each { cloud ->
 
   def templates = []
-  // cloud.templates.each { template ->
-  //     def dockerTemplateBase =
-  //         new DockerTemplateBase(
-  //            template.image,
-  //            template.dnsString,
-  //            template.dockerCommand,
-  //            template.volumesString,
-  //            template.volumesFromString,
-  //            template.environmentsString,
-  //            template.lxcConfString,
-  //            template.hostname,
-  //            template.memoryLimit,
-  //            template.memorySwap,
-  //            template.cpuShares,
-  //            template.bindPorts,
-  //            template.bindAllPorts,
-  //            template.privileged,
-  //            template.tty,
-  //            template.macAddress
-  //     )
-  //
-  //     def dockerTemplate =
-  //       new DockerTemplate(
-  //         dockerTemplateBase,
-  //         template.labelString,
-  //         template.remoteFs,
-  //         template.remoteFsMapping,
-  //         template.instanceCapStr
-  //       )
-  //
-  //     def dockerComputerSSHLauncher = new DockerComputerSSHLauncher(
-  //         new hudson.plugins.sshslaves.SSHConnector(22, template.credentialsId, null, null, null, null, null )
-  //     )
-  //
-  //     dockerTemplate.setLauncher(dockerComputerSSHLauncher)
-  //
-  //     dockerTemplate.setMode(Node.Mode.NORMAL)
-  //     dockerTemplate.setNumExecutors(1)
-  //     dockerTemplate.setRemoveVolumes(true)
-  //     dockerTemplate.setRetentionStrategy(new DockerOnceRetentionStrategy(10))
-  //     dockerTemplate.setPullStrategy(DockerImagePullStrategy.PULL_LATEST)
-  //
-  //     templates.add(dockerTemplate)
-  // }
+  cloud.templates.each { template ->
+      def dockerTemplateBase =
+          new DockerTemplateBase(
+             template.image,
+             template.dnsString,
+             template.network,
+             template.dockerCommand,
+             template.volumesString,
+             template.volumesFromString,
+             template.environmentsString,
+             template.lxcConfString,
+             template.hostname,
+             template.memoryLimit,
+             template.memorySwap,
+             template.cpuShares,
+             template.bindPorts,
+             template.bindAllPorts,
+             template.privileged,
+             template.tty,
+             template.macAddress
+      )
+
+      def dockerTemplate =
+        new DockerTemplate(
+          dockerTemplateBase,
+          template.labelString,
+          template.remoteFs,
+          template.remoteFsMapping,
+          template.instanceCapStr
+        )
+
+      def dockerComputerSSHLauncher = new DockerComputerSSHLauncher(
+          new hudson.plugins.sshslaves.SSHConnector(22, template.credentialsId, null, null, null, null, null )
+      )
+
+      dockerTemplate.setLauncher(dockerComputerSSHLauncher)
+
+      dockerTemplate.setMode(Node.Mode.NORMAL)
+      dockerTemplate.setNumExecutors(1)
+      dockerTemplate.setRemoveVolumes(true)
+      dockerTemplate.setRetentionStrategy(new DockerOnceRetentionStrategy(10))
+      dockerTemplate.setPullStrategy(DockerImagePullStrategy.PULL_LATEST)
+
+      templates.add(dockerTemplate)
+  }
 
   dockerClouds.add(
     new DockerCloud(cloud.name,
                     templates,
                     cloud.serverUrl,
                     cloud.containerCapStr,
-                    cloud.connectTimeout ?: 15, // Well, it's one for the money...
-                    cloud.readTimeout ?: 15,    // Two for the show
+                    cloud.connectTimeout ?: 15,
+                    cloud.readTimeout ?: 15,
                     cloud.credentialsId,
                     cloud.version
     )
   )
 }
 
-Jenkins.instance.clouds.addAll(dockerClouds)
+Jenkins.instance.clouds.replaceBy(dockerClouds)
 println 'Configured docker cloud.'
