@@ -635,6 +635,7 @@ Resources:
               export JJBREPO='${JJBRepo}'
               export JJBREPONAME="${!JJBREPO##*/}"
               export JJBTOKEN=$(openssl rand -hex 16)
+              export GHCREDS='${GithubCreds}'
 
               ##########################################################
               # Install cfn bootstraping tools
@@ -755,7 +756,8 @@ Resources:
               sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               ### Github Server Config (Pending)
               ### Credentials Config Script
-              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Credential Params"
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
+              sed -i 's/replaceGitToken/${!GHCREDS##*:}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
               ### Git Config Script
               sed -i 's/replaceGitEmail/${GitEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/git.groovy || error_exit "Groovy Bootstrap: Failed to replace Git Params"
               ### Slack Config Script
@@ -841,7 +843,7 @@ Resources:
               EOF
 
               cp -f /root/${!GITREPO%.*}/scripts/xml/* /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy XML files in place"
-              cp -rf /root/${!GITREPO%.*}/scripts/jobs /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy JJB Seed job"
+              cp -rf /root/${!GITREPO%.*}/scripts/jobs /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy JJB Seed/Sync job"
 
               chmod -R 755 /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory mode"
               chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory owner"
@@ -857,8 +859,7 @@ Resources:
               #   sleep 5
               # done
               #
-              # https://${JenkinsSubdomain}.${HostedZone}/job/jjb-test/build?token=${!JJBTOKEN}
-
+              # https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
 
               ##########################################################
               # NewRelic Config if Enabled
