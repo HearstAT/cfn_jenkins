@@ -100,6 +100,33 @@ docker_settings =
                 instanceCapStr: '2',
                 // SSH Launcher
                 credentialsId: 'jenkins-docker-server'
+            ],
+            [
+                // Docker Template Base
+                image: 'hearstat/jenkins-build-jjb',
+                dnsString: '',
+                network: '',
+                dockerCommand: '',
+                volumesString: '',
+                volumesFromString: '',
+                environmentsString: '',
+                lxcConfString: '',
+                hostname: '',
+                memoryLimit: 0,
+                memorySwap: 0,
+                cpuShares: 0,
+                bindPorts: '22',
+                bindAllPorts: false,
+                privileged: false,
+                tty: true,
+                macAddress: '',
+                // Docker Template
+                labelString: 'jjb',
+                remoteFs: '',
+                remoteFsMapping: '',
+                instanceCapStr: '1',
+                // SSH Launcher
+                credentialsId: 'jenkins-docker-server'
             ]
         ]
     ]

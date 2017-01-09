@@ -19,6 +19,7 @@ store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.Sys
 SystemCredentialsProvider system_creds = SystemCredentialsProvider.getInstance()
 Boolean foundDocker=false
 Boolean foundSlack=false
+Boolean foundGithub=false
 
 system_creds.getCredentials().each{
     if('jenkins-docker-server'.equals(it.getId())) {
@@ -50,4 +51,18 @@ if(!foundSlack) {
                                          Secret.fromString("replaceSlackToken"))
     store.addCredentials(domain, secretText)
     println 'Added slack token'
+}
+
+system_creds.getCredentials().each{
+    if('github-token'.equals(it.getId())) {
+        foundGithub=true
+    }
+}
+if(!foundGithub) {
+  secretText = new StringCredentialsImpl(CredentialsScope.GLOBAL,
+                                         'github-token',
+                                         'Github API Token',
+                                         Secret.fromString("replaceGitToken"))
+    store.addCredentials(domain, secretText)
+    println 'Added github token'
 }

@@ -32,12 +32,6 @@ Parameters:
       - 'false'
     Description: Choose to sync backup from Existing Bucket (Optional)
 
-  GHAdminCreds:
-    Type: String
-    NoEcho: 'true'
-    Default: ''
-    Description: Enter you Github Username and Personal Access Token in this format `ghuser:token`
-
   AdditionalBucket:
     Type: String
     Default: ''
@@ -95,8 +89,13 @@ Parameters:
       - t2.large
     ConstraintDescription: must be a valid EC2 instance type.
 
+  JJBRepo:
+    Type: String
+    Default: ''
+    Description: Enter Repo Clone URL for Jenkins Job Builder Templates
+
 ###############################################################################
-# Plugins Configuration
+# Github Configuration
 ###############################################################################
   GitEmail:
     Type: String
@@ -125,6 +124,15 @@ Parameters:
     Default: ''
     Description: Enter Github oauth ClientSecret
 
+  GithubCreds:
+    Type: String
+    NoEcho: 'true'
+    Default: ''
+    Description: Enter you Github Username and Personal Access Token in this format `ghuser:token`
+
+###############################################################################
+# Slack Configuration
+###############################################################################
   SlackTeam:
     Type: String
     Default: ''
@@ -277,7 +285,6 @@ Metadata:
       Parameters:
         - ExistingBucketName
         - RestoreBackup
-        - GHAdminCreds
         - AdditionalBucket
     -
       Label:
@@ -287,15 +294,22 @@ Metadata:
         - JenkinsSubdomain
         - JenkinsVersion
         - JenkinsLogLevel
+        - JJBRepo
     -
       Label:
-        default: Plugins Configuration
+        default: Github Configuration
       Parameters:
         - GithubAdmins
+        - GithubCreds
         - GithubOrg
         - GitEmail
         - GithubClientID
         - GithubClientSecret
+
+    -
+      Label:
+        default: Slack Configuration
+      Parameters:
         - SlackTeam
         - SlackRoom
         - SlackToken
@@ -618,6 +632,9 @@ Resources:
               export HOSTNAME="${JenkinsSubdomain}.${HostedZone}"
               export GITCLONE='${GitClone}'
               export GITREPO="${!GITCLONE##*/}"
+              export JJBREPO='${JJBRepo}'
+              export JJBREPONAME="${!JJBREPO##*/}"
+              export JJBTOKEN=$(openssl rand -hex 16)
 
               ##########################################################
               # Install cfn bootstraping tools
@@ -736,6 +753,7 @@ Resources:
               sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              ### Github Server Config (Pending)
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Credential Params"
               ### Git Config Script
@@ -751,6 +769,11 @@ Resources:
               sed -i 's/replaceMailPassword/${MailPassword}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              ### JJB Job Config
+              sed -i 's/replaceJJBJobs/${JJBRepo}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
+              sed -i 's/replaceRepoName/${!JJBREPONAME%.*}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
+              sed -i 's/replaceServerURL/${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
+              sed -i 's/replaceToken/${!JJBTOKEN}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
 
@@ -775,9 +798,9 @@ Resources:
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
                 chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/enkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory mode"
                 chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory owner"
-                if [ -n '${GHAdminCreds}' ]; then
+                if [ -n '${GithubCreds}' ]; then
                   unset $ADMINCREDS
-                  ADMINCREDS='${GHAdminCreds}'
+                  ADMINCREDS='${GithubCreds}'
                 fi
               fi
 
@@ -818,11 +841,24 @@ Resources:
               EOF
 
               cp -f /root/${!GITREPO%.*}/scripts/xml/* /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy XML files in place"
+              cp -rf /root/${!GITREPO%.*}/scripts/jobs /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy JJB Seed job"
 
               chmod -R 755 /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory mode"
               chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory owner"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
+
+              ##########################################################
+              # Run JJB Seed
+              ##########################################################
+
+              # until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+              #   printf '.'
+              #   sleep 5
+              # done
+              #
+              # https://${JenkinsSubdomain}.${HostedZone}/job/jjb-test/build?token=${!JJBTOKEN}
+
 
               ##########################################################
               # NewRelic Config if Enabled
@@ -907,6 +943,7 @@ Resources:
             export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             export STACKNAME='${AWS::StackName}'
             export HOSTNAME="${JenkinsSubdomain}-build-${!INSTANCE_ID}.${HostedZone}"
+            export GHCREDS='${GithubCreds}'
 
             ##########################################################
             # Install cfn bootstraping tools
@@ -987,6 +1024,27 @@ Resources:
             docker pull hearstat/jenkins-build-base:debian || error_exit "Failed to pull Base Image: Debian"
             docker pull hearstat/jenkins-build-base:alpine || error_exit "Failed to pull Base Image: Alpine"
             docker pull hearstat/jenkins-build-foodcritic || error_exit "Failed to pull Image: Foodcritic"
+
+            ##########################################################
+            # Jenkins Job Builder Config
+            ##########################################################
+
+            mkdir -p /etc/jenkins_jobs || error_exit "JJB: Failed to Create Directory"
+
+            cat > '/etc/jenkins_jobs/jenkins_jobs.ini' << EOF
+            [job_builder]
+            ignore_cache=True
+            keep_descriptions=False
+            recursive=True
+            allow_duplicates=False
+
+            [jenkins]
+            user=${!GHCREDS%:*}
+            password=${!GHCREDS##*:}
+            url=https://${JenkinsSubdomain}.${HostedZone}
+            EOF
+
+            chmod -R 777 /etc/jenkins_jobs || error_exit "JJB: Failed to chmod Directory and Files"
 
             ##########################################################
             # NewRelic Config if Enabled
