@@ -633,6 +633,7 @@ Resources:
               export GITCLONE='${GitClone}'
               export GITREPO="${!GITCLONE##*/}"
               export JJBREPO='${JJBRepo}'
+              export JJBSEDSAFE=$(echo JJBREPO | sed 's/\//\\\//g')
               export JJBREPONAME="${!JJBREPO##*/}"
               export JJBTOKEN=$(openssl rand -hex 16)
               export GHCREDS='${GithubCreds}'
@@ -772,10 +773,10 @@ Resources:
               sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               ### JJB Job Config
-              sed -i 's/replaceJJBJobs/${JJBRepo}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
-              sed -i 's/replaceRepoName/${!JJBREPONAME%.*}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
-              sed -i 's/replaceServerURL/${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
-              sed -i 's/replaceToken/${!JJBTOKEN}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb_seed/jjb_seed.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
+              sed -i 's/replaceJJBJobs/${!JJBSEDSAFE}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
+              sed -i 's/replaceRepoName/${!JJBREPONAME%.*}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
+              sed -i 's/replaceServerURL/${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
+              sed -i 's/replaceToken/${!JJBTOKEN}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
 
@@ -1025,6 +1026,7 @@ Resources:
             docker pull hearstat/jenkins-build-base:debian || error_exit "Failed to pull Base Image: Debian"
             docker pull hearstat/jenkins-build-base:alpine || error_exit "Failed to pull Base Image: Alpine"
             docker pull hearstat/jenkins-build-foodcritic || error_exit "Failed to pull Image: Foodcritic"
+            docker pull hearstat/jenkins-build-jjb || error_exit "Failed to pull Image: Jenkins Job Builder"
 
             ##########################################################
             # Jenkins Job Builder Config
