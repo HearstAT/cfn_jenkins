@@ -1,14 +1,15 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<hudson.plugins.s3.S3BucketPublisher_-DescriptorImpl plugin="s3@0.8">
+<hudson.plugins.s3.S3BucketPublisher_-DescriptorImpl plugin="s3@0.10.11">
   <profiles>
     <hudson.plugins.s3.S3Profile>
       <name>S3_IAM</name>
       <accessKey></accessKey>
       <secretKey></secretKey>
-      <proxyHost></proxyHost>
-      <proxyPort></proxyPort>
       <maxUploadRetries>5</maxUploadRetries>
-      <retryWaitTime>5</retryWaitTime>
+      <uploadRetryTime>0</uploadRetryTime>
+      <maxDownloadRetries>0</maxDownloadRetries>
+      <downloadRetryTime>0</downloadRetryTime>
+      <keepStructure>false</keepStructure>
       <useRole>true</useRole>
       <signedUrlExpirySeconds>60</signedUrlExpirySeconds>
     </hudson.plugins.s3.S3Profile>

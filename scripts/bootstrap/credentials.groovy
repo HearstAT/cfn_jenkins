@@ -18,9 +18,11 @@ store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.Sys
 //Configure Credentials
 SystemCredentialsProvider system_creds = SystemCredentialsProvider.getInstance()
 Boolean foundDocker=false
-Boolean foundSlack=false
 Boolean foundGithub=false
+Boolean foundSlack=false
+Boolean foundGithubToken=false
 
+// Username & Password Credentials
 system_creds.getCredentials().each{
     if('jenkins-docker-server'.equals(it.getId())) {
         foundDocker=true
@@ -36,9 +38,28 @@ if(!foundDocker) {
                                             'jenkins')
     domainCredentialsMap[Domain.global()].add(creds)
     system_creds.save()
-    println 'Added docker cloud credentials.'
+    println 'Added Docker Cloud Credentials'
 }
 
+system_creds.getCredentials().each{
+    if('jenkins-docker-server'.equals(it.getId())) {
+        foundGithub=true
+    }
+}
+if(!foundGithub) {
+    Map<Domain, List<Credentials>> domainCredentialsMap = system_creds.getDomainCredentialsMap()
+    UsernamePasswordCredentialsImpl creds =
+        new UsernamePasswordCredentialsImpl(CredentialsScope.SYSTEM,
+                                            'github-login-creds',
+                                            'Github Login Credentials',
+                                            'replaceGitLogin',
+                                            'replaceGitToken')
+    domainCredentialsMap[Domain.global()].add(creds)
+    system_creds.save()
+    println 'Added Github Login Credentials'
+}
+
+// Secret Text or Token Credentials
 system_creds.getCredentials().each{
     if('slack-integration-token'.equals(it.getId())) {
         foundSlack=true
@@ -50,19 +71,19 @@ if(!foundSlack) {
                                          'Slack Integration Token',
                                          Secret.fromString("replaceSlackToken"))
     store.addCredentials(domain, secretText)
-    println 'Added slack token'
+    println 'Added Slack Token'
 }
 
 system_creds.getCredentials().each{
     if('github-token'.equals(it.getId())) {
-        foundGithub=true
+        foundGithubToken=true
     }
 }
-if(!foundGithub) {
+if(!foundGithubToken) {
   secretText = new StringCredentialsImpl(CredentialsScope.GLOBAL,
                                          'github-token',
                                          'Github API Token',
                                          Secret.fromString("replaceGitToken"))
     store.addCredentials(domain, secretText)
-    println 'Added github token'
+    println 'Added Github Token'
 }

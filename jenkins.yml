@@ -633,7 +633,7 @@ Resources:
               export GITCLONE='${GitClone}'
               export GITREPO="${!GITCLONE##*/}"
               export JJBREPO='${JJBRepo}'
-              export JJBSEDSAFE=$(echo JJBREPO | sed 's/\//\\\//g')
+              export JJBSEDSAFE=$(echo ${!JJBREPO} | sed 's/\//\\\//g')
               export JJBREPONAME="${!JJBREPO##*/}"
               export JJBTOKEN=$(openssl rand -hex 16)
               export GHCREDS='${GithubCreds}'
@@ -758,7 +758,8 @@ Resources:
               ### Github Server Config (Pending)
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
-              sed -i 's/replaceGitToken/${!GHCREDS##*:}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
+              sed -i "s/replaceGitLogin/${!GHCREDS%:*}/g" /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
+              sed -i "s/replaceGitToken/${!GHCREDS##*:}/g" /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
               ### Git Config Script
               sed -i 's/replaceGitEmail/${GitEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/git.groovy || error_exit "Groovy Bootstrap: Failed to replace Git Params"
               ### Slack Config Script
@@ -773,10 +774,10 @@ Resources:
               sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               ### JJB Job Config
-              sed -i 's/replaceJJBJobs/${!JJBSEDSAFE}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
-              sed -i 's/replaceRepoName/${!JJBREPONAME%.*}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
-              sed -i 's/replaceServerURL/${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
-              sed -i 's/replaceToken/${!JJBTOKEN}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/jjb-sync.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
+              sed -i "s/replaceJJBJobs/${!JJBSEDSAFE}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
+              sed -i "s/replaceRepoName/${!JJBREPONAME%.*}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
+              sed -i 's/replaceServerURL/${JenkinsSubdomain}.${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
+              sed -i "s/replaceToken/${!JJBTOKEN}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
 
@@ -786,13 +787,6 @@ Resources:
               done
 
               ADMINCREDS="admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
-
-              systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins"
-
-              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
-                printf '.'
-                sleep 5
-              done
 
               crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
               curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
@@ -805,7 +799,12 @@ Resources:
                   unset $ADMINCREDS
                   ADMINCREDS='${GithubCreds}'
                 fi
+
+              systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins (Existing Restore)"
+
               fi
+
+              sleep 5
 
               until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
                 printf '.'
@@ -833,7 +832,7 @@ Resources:
               ${JenkinsVersion}
               EOF
 
-              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --exclude "*/*" --exclude ".jenkins" --include "*.xml" --include "*.key" --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
+              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --exclude "*/*" --exclude ".jenkins" --include "/*.xml" --include "*.key" --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
 
               mkdir -p /var/lib/jenkins/data || error_exit "Jenkins Bootstrap: Failed to create Jenkins data directory"
 

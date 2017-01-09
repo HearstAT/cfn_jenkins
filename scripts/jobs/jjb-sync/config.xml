@@ -24,7 +24,7 @@
     <userRemoteConfigs>
       <hudson.plugins.git.UserRemoteConfig>
         <url>replaceJJBJobs</url>
-        <credentialsId>github-creds</credentialsId>
+        <credentialsId>github-login-creds</credentialsId>
       </hudson.plugins.git.UserRemoteConfig>
     </userRemoteConfigs>
     <branches>
