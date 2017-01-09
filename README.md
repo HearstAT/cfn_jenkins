@@ -1,11 +1,16 @@
 # Jenkins Cloudformation
 
-Our Jenkins configuration
+Our Jenkins Configuration
 
 ## Info
--   Builds out Jenkins Master
+-   Builds out Jenkins Master that's managed via Systemd
 -   Builds out Docker Host box for running Jenkins Jobs
--   Uses Groovy Scripts to Configure Jenkins, Credentials, and Plugins
+-   Uses Groovy Scripts to Configure Jenkins, Credentials, and Plugins; See [Plugins](#plugins) Sections for specifics
+    -   Configures Docker Templates for using Docker as Job Servers
+    -   Configures Github & Git Plugins w/ Credentials
+    -   Configures Slack Notification Plugin
+-   Utilizes [Jenkins Job Builder](http://docs.openstack.org/infra/jenkins-job-builder/) for Job Templates and Creates a Seed/Sync Job to Restore/Build Jobs
+    -   See [Jenkins Job Builder](#jenkins-job-builder) Section for specifics
 
 ## Diagram
 ![Alt text](Jenkins_Build_Out.png?raw=true "Overview Diagram")
@@ -28,20 +33,22 @@ Our Jenkins configuration
 -   Redeploy/Existing Install Configuration
     -   ExistingBucketName; See [Restore/Backup Options](#restorebackup-options) Section for more info
     -   RestoreBackup; See [Restore/Backup Options](#restorebackup-options) Section for more info
-    -   GHAdminCreds; Enter you Github Username and [Personal Access Token](https://github.com/settings/tokens) in this format `ghuser:token`
-        -   See [Restore/Backup Options](#restorebackup-options) Section for more info
     -   AdditionalBucket; Add access to another S3 bucket via IAM Profile
 -   Jenkins Configuration
     -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
     -   JenkinsSubdomain; Choose subdomain to create in
     -   JenkinsVersion; Select which version of Jenkins you want to install (>= 2.x Only Available)
     -   JenkinsLogLevel; Select which log level you want Jenkins to log at
--   Plugins Configuration
-    -   GitEmail; [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin): Enter Git Commit email
+    -   JJBRepo; Enter url for Jenkins Job Builder Templates to Seed/Sync to Jenkins. (See [Jenkins Job Builer](#jenkins-job-builder) Section for more info)
+-   Github Configuration (See [Github Section](#github) for more Info)
     -   GithubAdmins; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Enter a comma delimited list of Github Usernames to act as Jenkins Admins (i.e.; octobob, turkeydaniels, catarang)
+    -   GithubCreds; Enter you Github Username and [Personal Access Token](https://github.com/settings/tokens) in this format `ghuser:token`
+            -   See [Restore/Backup Options](#restorebackup-options) Section for more info specific information how this affects restoring backups
     -   GithubOrg; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Enter Organization to use for Jenkins Authorization
+    -   GitEmail; [Git Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Git+Plugin): Enter Git Commit email
     -   GithubClientID; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Github Auth Integration ClientID
     -   GithubClientSecret; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Github Auth Integration Client Secret
+-   Slack Configuration (See [Slack Section](#slack) for more Info)
     -   SlackTeam; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Slack Team to Connect To
     -   SlackRoom; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Default Slack Room to Post to
     -   SlackToken; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Jenkins-CI Integration Token from Slack
@@ -83,6 +90,17 @@ See [Contributing](#contributing) for how to contribute to this project
 -   GitClone; If using a Forked repo or different repo just for scripts
 -   GitBranch; sets branch to pull scripts from
     -   Affects which branch the scripts folders in pulled from
+
+### Jenkins Job Builder
+-   [ ] Fill Out Section
+
+### Plugins
+
+#### Github
+-   [ ] Fill Out Section
+
+#### Slack
+-   [ ] Fill Out Section
 
 ### SSL Setup
 To simplify the setup only the ELB (Public Side) is setup with SSL.
