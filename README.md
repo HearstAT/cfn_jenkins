@@ -33,7 +33,6 @@ Our Jenkins Configuration
 -   Redeploy/Existing Install Configuration
     -   ExistingBucketName; See [Restore/Backup Options](#restorebackup-options) Section for more info
     -   RestoreBackup; See [Restore/Backup Options](#restorebackup-options) Section for more info
-    -   AdditionalBucket; Add access to another S3 bucket via IAM Profile
 -   Jenkins Configuration
     -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
     -   JenkinsSubdomain; Choose subdomain to create in
@@ -52,6 +51,8 @@ Our Jenkins Configuration
     -   SlackTeam; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Slack Team to Connect To
     -   SlackRoom; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Default Slack Room to Post to
     -   SlackToken; [Slack Notification](https://wiki.jenkins-ci.org/display/JENKINS/Slack+Plugin): Enter Jenkins-CI Integration Token from Slack
+-   S3 Configuration
+    -   IAMBucketAccess; True/False Option. Select true to give Jenkins Master access to all S3 Buckets (work around until I figure out something better)
 -   Mail Configuration
     -   AdminEmail; Email Address to Jenkins email from
     -   MailUser; admin
@@ -92,15 +93,115 @@ See [Contributing](#contributing) for how to contribute to this project
     -   Affects which branch the scripts folders in pulled from
 
 ### Jenkins Job Builder
--   [ ] Fill Out Section
+This build out comes completely integrated with the [Jenkins Job Builder](http://docs.openstack.org/infra/jenkins-job-builder/) (JJB) from Openstack
+
+-   Creates a JJB Sync Job that will pull down a repo (Set by the JJBRepo Param) and run `jenins-jobs update` against that repo to seed a new instance
+    -   It's also setup to auto-update jenkins on any git pushes to the repo post-build
+
+#### Example Job (Using Job Templates)
+Create Multiple Jobs that require the same build Process
+
+```yaml
+---
+- project:
+    name: 'Website'
+    # Iterates over this data to create identical jobs with website specific info
+    websites:
+      - Karate_Bob:
+          gitrepo: 'https://github.com/mygit/karatebob.git'
+          branch: 'master'
+          bucket: 'karatebob.com'
+          region: 'us-east-1'
+          s3-profile: 's3-iam'
+      - Awesome_Sauce:
+          gitrepo: 'https://github.com/mygit/awesomesauce.git'
+          branch: 'master'
+          bucket: 'awesomesauce.com'
+          region: 'us-east-1'
+          s3-profile: 's3-iam'
+    jobs:
+      - '{name}-{websites}'
+
+# Templates that gets re-used with data from above
+- job-template:
+    name: '{name}-{websites}'
+    description: 'S3 Website Publisher For {websites} - '
+    project-type: freestyle
+    defaults: global
+    display-name: '{name} {websites}'
+    block-downstream: false
+    block-upstream: false
+    node: master
+    build-discarder:
+      numToKeep: 10
+    triggers:
+      - github
+    scm:
+      - git:
+          url: '{gitrepo}'
+          credentials-id: 'github-login-creds'
+          branches:
+            - {branch}
+          browser: githubweb
+          browser-url: '{gitrepo}'
+          timeout: 5
+    publishers:
+      - s3:
+        s3-profile: '{s3-profile}'
+        entries:
+          - destination-bucket: {bucket}
+            source-files: '**/*'
+            storage-class: STANDARD
+            bucket-region: {region}
+            upload-on-failure: true
+            upload-from-slave: false
+            managed-artifacts: false
+            s3-encryption: false
+            flatten: false
+```
+
+#### Example view
+Create a view that only shows the above create websites
+
+```yaml
+---
+- view:
+    name: Websites
+    view-type: list
+    regex: 'Website-*'
+```
 
 ### Plugins
 
 #### Github
--   [ ] Fill Out Section
+-   Github Oauth
+    -   Changes Jenkins Oauth to a Specific Github Org
+        -   All and only the folks in this org can log into Jenkins
+    -   Admins are set via GithubAdmins param (must be part of Org)
+    -   Requires a Github Client ID and Secret to function
+        -   See the [Github](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin) Plugin Wiki for more info
+-   Github Server
+    -   Sets up a github server with the credentials seeded with the [credentials](scripts/bootstrap/credentials.groovy) script (GithubCreds param)
 
 #### Slack
--   [ ] Fill Out Section
+Setups the Global Slack plugin with the following
+-   Team Domain set via SlackTeam param
+-   Set Token Credential ID
+    -   Utilizes the credentials plugin to store the slack token via [credentials](scripts/bootstrap/credentials.groovy) script
+-   Sends as Jenkins
+-   Default room set via SlackRoom param
+
+#### Warnings
+Custom Warnings parser configured for Chef Foodcritic
+
+See the [Warnings](scripts/xml/hudson.plugins.warnings.WarningsPublisher.xml) file for more info
+
+#### S3 Publisher
+There is a profile created to allow S3 access via IAM Profile on the Jenkins Master
+
+See the [S3 Publisher](scripts/xml/hudson.plugins.s3.S3BucketPublisher.xml) file for more info
+
+IAMBucketAccess and ExistingBucketName params affect this setup
 
 ### SSL Setup
 To simplify the setup only the ELB (Public Side) is setup with SSL.

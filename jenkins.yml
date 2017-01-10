@@ -32,11 +32,6 @@ Parameters:
       - 'false'
     Description: Choose to sync backup from Existing Bucket (Optional)
 
-  AdditionalBucket:
-    Type: String
-    Default: ''
-    Description: Enter a Additional Bucket Name (if you want to use S3 IAM Profile Access for it)
-
 ###############################################################################
 # Jenkins Configuration
 ###############################################################################
@@ -150,7 +145,18 @@ Parameters:
     Description: Enter Slack Token
 
 ###############################################################################
-# Plugins Configuration
+# Slack Configuration
+###############################################################################
+  IAMBucketAccess:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Choose to if you wish to give the Jenkins Master full S3 Access
+
+###############################################################################
+# Mail Configuration
 ###############################################################################
   AdminEmail:
     Type: String
@@ -285,7 +291,6 @@ Metadata:
       Parameters:
         - ExistingBucketName
         - RestoreBackup
-        - AdditionalBucket
     -
       Label:
         default: Jenkins Configuration
@@ -313,6 +318,11 @@ Metadata:
         - SlackTeam
         - SlackRoom
         - SlackToken
+    -
+      Label:
+        default: S3 Configuration
+      Parameters:
+        - IAMBucketAccess
     -
       Label:
         default: Mail Configuration
@@ -359,8 +369,12 @@ Conditions:
   # Creates bucket if no existing name entered
   JenkinsBucketCon:
     !Equals [ !Ref ExistingBucketName, '' ]
-  AdditionalBucketCon:
-    !Not [ !Equals [ !Ref AdditionalBucket, '' ] ]
+  # Grants access to all S3 Buckets
+  IAMBucketAccessCon:
+    !Equals [ !Ref IAMBucketAccess, 'true' ]
+  # Grants Access to Jenkins Specific S3 Buckup (for backups)
+  NonIAMBucketAccessCon:
+    !Equals [ !Ref IAMBucketAccess, 'false' ]
 
 Mappings:
   RegionMap:
@@ -432,6 +446,7 @@ Resources:
 
   RolePolicies:
     Type: AWS::IAM::Policy
+    Condition: NonIAMBucketAccessCon
     Properties:
       PolicyName: !Sub ${AWS::StackName}-JenkinsServer-Policy
       PolicyDocument:
@@ -456,18 +471,16 @@ Resources:
 
   AdditionalBucketPolicies:
     Type: AWS::IAM::Policy
-    Condition: AdditionalBucketCon
+    Condition: IAMBucketAccessCon
     Properties:
-      PolicyName: !Sub ${AWS::StackName}-JenkinsServer-AdditionalBuckets-Policy
+      PolicyName: !Sub ${AWS::StackName}-JenkinsServer-AllBucketAccess-Policy
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          # Allow all actions to one bucket (the supplied one, or the one you provided)
           - Action: s3:*
             Effect: Allow
             Resource:
-              - !Sub arn:aws:s3:::${AdditionalBucket}
-              - !Sub arn:aws:s3:::${AdditionalBucket}/*
+              - !Sub arn:aws:s3:::*
       Roles:
         - !Ref InstanceRole
 
@@ -829,7 +842,17 @@ Resources:
               ${JenkinsVersion}
               EOF
 
-              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins --exclude "*" --exclude "*/*" --exclude ".jenkins" --include "/*.xml" --include "*.key" --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
+              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins \
+                  --exclude "*" \
+                  --exclude "*/*" \
+                  --exclude ".jenkins" \
+                  --exclude "jobs/*" \
+                  --exclude "war/*" \
+                  --exclude "users/*" \
+                  --exclude "plugins/*" \
+                  --include "*.xml" \
+                  --include "*.key" \
+                  --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
 
               mkdir -p /var/lib/jenkins/data || error_exit "Jenkins Bootstrap: Failed to create Jenkins data directory"
 
