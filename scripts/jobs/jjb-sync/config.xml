@@ -57,7 +57,6 @@
     <jenkins.plugins.slack.SlackNotifier plugin="slack@2.0.1">
       <teamDomain></teamDomain>
       <authToken></authToken>
-      <buildServerUrl>replaceServerURL</buildServerUrl>
       <room></room>
       <startNotification>false</startNotification>
       <notifySuccess>true</notifySuccess>

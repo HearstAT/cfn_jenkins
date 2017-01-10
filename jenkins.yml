@@ -776,7 +776,6 @@ Resources:
               ### JJB Job Config
               sed -i "s/replaceJJBJobs/${!JJBSEDSAFE}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
               sed -i "s/replaceRepoName/${!JJBREPONAME%.*}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
-              sed -i 's/replaceServerURL/${JenkinsSubdomain}.${HostedZone}/g' /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Build URL"
               sed -i "s/replaceToken/${!JJBTOKEN}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
