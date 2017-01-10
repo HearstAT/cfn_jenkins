@@ -828,6 +828,11 @@ Resources:
                 ADMINCREDS='${GithubCreds}'
               fi
 
+              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+                printf '.'
+                sleep 5
+              done
+
               crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
 
               for script in $(ls /root/${!GITREPO%.*}/scripts/groovy/); do
@@ -883,20 +888,6 @@ Resources:
               done
 
               curl -X POST https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
-
-              ##########################################################
-              # Clone Script Repo
-              ##########################################################
-
-              if [ ! -d "/root/${!GITREPO%.*}" ]; then
-                cd /root && git clone ${!GITCLONE} || error_exit "Get Groovy Scripts: Failed to Clone Scripts from Repo"
-              else
-                cd /root/${!GITREPO%.*} && git pull || error_exit "Get Groovy Scripts: Failed pull updates"
-              fi
-
-              if [ '${GitBranch}' != 'master' ]; then
-                cd /root/${!GITREPO%.*} && git checkout ${GitBranch} || error_exit "Get Groovy Scripts: Failed to switch to ${GitBranch} branch"
-              fi
 
               ##########################################################
               # NewRelic Config if Enabled
@@ -1101,6 +1092,21 @@ Resources:
             EOF
 
             chmod -R 777 /etc/jenkins_jobs || error_exit "JJB: Failed to chmod Directory and Files"
+
+
+            ##########################################################
+            # Clone Script Repo
+            ##########################################################
+
+            if [ ! -d "/root/${!GITREPO%.*}" ]; then
+              cd /root && git clone ${!GITCLONE} || error_exit "Get Groovy Scripts: Failed to Clone Scripts from Repo"
+            else
+              cd /root/${!GITREPO%.*} && git pull || error_exit "Get Groovy Scripts: Failed pull updates"
+            fi
+
+            if [ '${GitBranch}' != 'master' ]; then
+              cd /root/${!GITREPO%.*} && git checkout ${GitBranch} || error_exit "Get Groovy Scripts: Failed to switch to ${GitBranch} branch"
+            fi
 
             ##########################################################
             # NewRelic Config if Enabled
