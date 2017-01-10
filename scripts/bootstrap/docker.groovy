@@ -41,7 +41,7 @@ docker_settings =
                 macAddress: '',
                 // Docker Template
                 labelString: 'base docker debian',
-                remoteFs: '',
+                remoteFs: '/var/lib/jenkins',
                 remoteFsMapping: '',
                 instanceCapStr: '2',
                 // SSH Launcher
@@ -68,7 +68,7 @@ docker_settings =
                 macAddress: '',
                 // Docker Template
                 labelString: 'base docker alpine',
-                remoteFs: '',
+                remoteFs: '/var/lib/jenkins',
                 remoteFsMapping: '',
                 instanceCapStr: '2',
                 // SSH Launcher
@@ -95,7 +95,7 @@ docker_settings =
                 macAddress: '',
                 // Docker Template
                 labelString: 'chef foodcritic',
-                remoteFs: '',
+                remoteFs: '/var/lib/jenkins',
                 remoteFsMapping: '',
                 instanceCapStr: '2',
                 // SSH Launcher
@@ -107,7 +107,7 @@ docker_settings =
                 dnsString: '',
                 network: '',
                 dockerCommand: '',
-                volumesString: '',
+                volumesString: '/etc/jenkins_jobs:/etc/jenkins_jobs',
                 volumesFromString: '',
                 environmentsString: '',
                 lxcConfString: '',
@@ -122,7 +122,7 @@ docker_settings =
                 macAddress: '',
                 // Docker Template
                 labelString: 'jjb',
-                remoteFs: '',
+                remoteFs: '/var/lib/jenkins',
                 remoteFsMapping: '',
                 instanceCapStr: '1',
                 // SSH Launcher
@@ -168,7 +168,7 @@ docker_settings.each { cloud ->
         )
 
       def dockerComputerSSHLauncher = new DockerComputerSSHLauncher(
-          new SSHConnector(22, template.credentialsId, null, null, null, null, null )
+          new SSHConnector(22, template.credentialsId, null, null, null, null, 5, 2, 5 )
       )
 
       dockerTemplate.setLauncher(dockerComputerSSHLauncher)

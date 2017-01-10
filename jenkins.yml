@@ -634,7 +634,6 @@ Resources:
               export GITREPO="${!GITCLONE##*/}"
               export JJBREPO='${JJBRepo}'
               export JJBSEDSAFE=$(echo ${!JJBREPO} | sed 's/\//\\\//g')
-              export JJBREPONAME="${!JJBREPO##*/}"
               export JJBTOKEN=$(openssl rand -hex 16)
               export GHCREDS='${GithubCreds}'
 
@@ -775,7 +774,6 @@ Resources:
               sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               ### JJB Job Config
               sed -i "s/replaceJJBJobs/${!JJBSEDSAFE}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
-              sed -i "s/replaceRepoName/${!JJBREPONAME%.*}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo Name"
               sed -i "s/replaceToken/${!JJBTOKEN}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
@@ -853,12 +851,12 @@ Resources:
               # Run JJB Seed
               ##########################################################
 
-              # until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
-              #   printf '.'
-              #   sleep 5
-              # done
-              #
-              # https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
+              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+                printf '.'
+                sleep 5
+              done
+
+              https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
 
               ##########################################################
               # NewRelic Config if Enabled
@@ -1016,6 +1014,21 @@ Resources:
 
             systemctl daemon-reload || error_exit "Failed to reload Docker Daemon Changes"
             systemctl restart docker || error_exit "Failed to restart Docker Daemon"
+
+            cat > '/root/.bashrc' << EOF
+            dcleanup(){
+              docker rm $(docker ps -aq 2>/dev/null) 2>/dev/null
+              docker rm -v $(docker ps --filter status=exited -q 2>/dev/null) 2>/dev/null
+              docker rmi $(docker images --filter dangling=true -q 2>/dev/null) 2>/dev/null
+            }
+            EOF
+
+            touch /var/spool/cron/crontabs/root
+            # Set to 0500 UTC (9pmPST|11pmCST)
+            crontab -l > dockerclean_cron
+            echo "00 5 * * * dcleanup" >> dockerclean_cron
+            crontab dockerclean_cron
+            rm dockerclean_cron
 
             ##########################################################
             # Docker Get Base Images

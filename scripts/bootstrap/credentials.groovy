@@ -42,14 +42,14 @@ if(!foundDocker) {
 }
 
 system_creds.getCredentials().each{
-    if('jenkins-docker-server'.equals(it.getId())) {
+    if('github-login-creds'.equals(it.getId())) {
         foundGithub=true
     }
 }
 if(!foundGithub) {
     Map<Domain, List<Credentials>> domainCredentialsMap = system_creds.getDomainCredentialsMap()
     UsernamePasswordCredentialsImpl creds =
-        new UsernamePasswordCredentialsImpl(CredentialsScope.SYSTEM,
+        new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL,
                                             'github-login-creds',
                                             'Github Login Credentials',
                                             'replaceGitLogin',

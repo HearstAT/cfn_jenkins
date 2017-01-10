@@ -2,6 +2,7 @@
 <project>
   <actions/>
   <description>Jenkins Job Builder - Sync Job</description>
+    <displayName>Jenkins Job Builder Sync</displayName>
   <logRotator class="hudson.tasks.LogRotator">
     <daysToKeep>-1</daysToKeep>
     <numToKeep>10</numToKeep>
@@ -50,7 +51,7 @@
   <concurrentBuild>false</concurrentBuild>
   <builders>
     <hudson.tasks.Shell>
-      <command>jenkins-jobs update --recursive ./replaceRepoName/*</command>
+      <command>jenkins-jobs update --recursive ./</command>
     </hudson.tasks.Shell>
   </builders>
   <publishers>
@@ -67,7 +68,7 @@
       <notifyBackToNormal>false</notifyBackToNormal>
       <notifyRepeatedFailure>false</notifyRepeatedFailure>
       <includeTestSummary>false</includeTestSummary>
-      <commitInfoChoice>AUTHORS</commitInfoChoice>
+      <commitInfoChoice>AUTHORS_AND_TITLES</commitInfoChoice>
       <includeCustomMessage>false</includeCustomMessage>
       <customMessage></customMessage>
     </jenkins.plugins.slack.SlackNotifier>
