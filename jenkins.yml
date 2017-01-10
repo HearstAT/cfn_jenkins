@@ -444,7 +444,7 @@ Resources:
               - "sts:AssumeRole"
       Path: "/"
 
-  RolePolicies:
+  SingleBucketPolicy:
     Type: AWS::IAM::Policy
     Condition: NonIAMBucketAccessCon
     Properties:
@@ -462,14 +462,10 @@ Resources:
           - Action: s3:List*
             Effect: Allow
             Resource: arn:aws:s3:::*
-          # Allow instances to read their own tags (needed for setup script below)
-          - Action: ec2:DescribeTags
-            Effect: Allow
-            Resource: "*"
       Roles:
         - !Ref InstanceRole
 
-  AdditionalBucketPolicies:
+  AllBucketPolicy:
     Type: AWS::IAM::Policy
     Condition: IAMBucketAccessCon
     Properties:
@@ -763,28 +759,28 @@ Resources:
 
               ## Swap Placeholders with Params
               ### Github Oauth Config Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               ### Github Server Config (Pending)
               ### Credentials Config Script
-              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
-              sed -i "s/replaceGitLogin/${!GHCREDS%:*}/g" /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
-              sed -i "s/replaceGitToken/${!GHCREDS##*:}/g" /root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
+              sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/groovy/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
+              sed -i "s/replaceGitLogin/${!GHCREDS%:*}/g" /root/${!GITREPO%.*}/scripts/groovy/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
+              sed -i "s/replaceGitToken/${!GHCREDS##*:}/g" /root/${!GITREPO%.*}/scripts/groovy/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Credential Params"
               ### Git Config Script
-              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/git.groovy || error_exit "Groovy Bootstrap: Failed to replace Git Params"
+              sed -i 's/replaceGitEmail/${GitEmail}/g' /root/${!GITREPO%.*}/scripts/groovy/git.groovy || error_exit "Groovy Bootstrap: Failed to replace Git Params"
               ### Slack Config Script
-              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
-              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
+              sed -i 's/replaceSlackTeam/${SlackTeam}/g' /root/${!GITREPO%.*}/scripts/groovy/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
+              sed -i 's/replaceSlackRoom/${SlackRoom}/g' /root/${!GITREPO%.*}/scripts/groovy/slack.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Params"
               ### Docker Config Script
-              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy || error_exit "Groovy Bootstrap: Failed to replace Docker Params"
+              sed -i 's/replaceDockerIP/${DOCKERIP}/g' /root/${!GITREPO%.*}/scripts/groovy/docker.groovy || error_exit "Groovy Bootstrap: Failed to replace Docker Params"
               ### Mail Config
-              sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
-              sed -i 's/replaceMailUser/${MailUser}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
-              sed -i 's/replaceMailPassword/${MailPassword}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
-              sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
-              sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceAdminEmail/${AdminEmail}/g' /root/${!GITREPO%.*}/scripts/groovy/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailUser/${MailUser}/g' /root/${!GITREPO%.*}/scripts/groovy/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailPassword/${MailPassword}/g' /root/${!GITREPO%.*}/scripts/groovy/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailHost/${MailHost}/g' /root/${!GITREPO%.*}/scripts/groovy/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
+              sed -i 's/replaceMailPort/${MailPort}/g' /root/${!GITREPO%.*}/scripts/groovy/mail.groovy || error_exit "Groovy Bootstrap: Failed to replace Mail Params"
               ### JJB Job Config
               sed -i "s/replaceJJBJobs/${!JJBSEDSAFE}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo URL"
               sed -i "s/replaceToken/${!JJBTOKEN}/g" /root/${!GITREPO%.*}/scripts/jobs/jjb-sync/config.xml || error_exit "Groovy Bootstrap: Failed to replace JJB Job Repo External Token"
@@ -796,17 +792,20 @@ Resources:
                 sleep 5
               done
 
-              ADMINCREDS="admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+              if [ ! -f /var/lib/jenkins/github_bootstrap ]; then
+                ADMINCREDS="admin:$(cat /var/lib/jenkins/secrets/initialAdminPassword)"
+              else
+                ADMINCREDS='${GithubCreds}'
+              fi
 
               crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
               ## Pull In Backup Data
               if [ -n ${ExistingBucketName} ] && [ ${RestoreBackup} == 'true' ]; then
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
                 chmod -R 755 /var/run/jenkins/ /var/lib/jenkins /usr/share/enkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory mode"
                 chown -R jenkins:jenkins /var/run/jenkins/ /var/lib/jenkins /usr/share/jenkins /var/log/jenkins || error_exit "Jenkins Install: Failed to change Jenkins directory owner"
-                if [ -n '${GithubCreds}' ]; then
-                  unset $ADMINCREDS
+                if [ -f /var/lib/jenkins/github_bootstrap ]; then
                   ADMINCREDS='${GithubCreds}'
                 fi
 
@@ -821,17 +820,22 @@ Resources:
                 sleep 5
               done
 
-              crumb=`curl --user "${!ADMINCREDS}"  "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              if [ ! -f /var/lib/jenkins/github_bootstrap ]; then
+                crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
+                touch /var/lib/jenkins/github_bootstrap
+                systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins (Github Auth)"
+                ADMINCREDS='${GithubCreds}'
+              fi
 
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/buildPort.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Build Port Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/executors.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Executors Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/security.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Security Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/mail.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Mail Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/credentials.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Credentials Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/slack.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/git.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/docker.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugin Config"
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
+              crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+
+              for script in $(ls /root/${!GITREPO%.*}/scripts/groovy/); do
+                if [ "${!script}" != 'github_auth.groovy' ] || [ "${!script}" != 'plugins.groovy' ]; then
+                  curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/${!script})" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Script; $!{script}"
+                fi
+              done
+
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
 
               cat > '/var/lib/jenkins/jenkins.install.InstallUtil.lastExecVersion' << EOF
@@ -843,16 +847,15 @@ Resources:
               EOF
 
               aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins \
-                  --exclude "*" \
-                  --exclude "*/*" \
-                  --exclude ".jenkins" \
-                  --exclude "jobs/*" \
-                  --exclude "war/*" \
-                  --exclude "users/*" \
-                  --exclude "plugins/*" \
-                  --include "*.xml" \
-                  --include "*.key" \
-                  --include "secrets/*" || error_exit "Jenkins Sync: Failed to sync new data"
+              --exclude "*" \
+              --exclude "*/*" \
+              --include "github_bootstrap" \
+              --include "hudson.*.xml" \
+              --include "jenkins*.xml" \
+              --include "config.xml" \
+              --include "credentials.xml" \
+              --include "*.key" \
+              --include "*secrets/*"
 
               mkdir -p /var/lib/jenkins/data || error_exit "Jenkins Bootstrap: Failed to create Jenkins data directory"
 
@@ -879,14 +882,28 @@ Resources:
                 sleep 5
               done
 
-              https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
+              curl -X POST https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
+
+              ##########################################################
+              # Clone Script Repo
+              ##########################################################
+
+              if [ ! -d "/root/${!GITREPO%.*}" ]; then
+                cd /root && git clone ${!GITCLONE} || error_exit "Get Groovy Scripts: Failed to Clone Scripts from Repo"
+              else
+                cd /root/${!GITREPO%.*} && git pull || error_exit "Get Groovy Scripts: Failed pull updates"
+              fi
+
+              if [ '${GitBranch}' != 'master' ]; then
+                cd /root/${!GITREPO%.*} && git checkout ${GitBranch} || error_exit "Get Groovy Scripts: Failed to switch to ${GitBranch} branch"
+              fi
 
               ##########################################################
               # NewRelic Config if Enabled
               ##########################################################
 
               if [ -n "${NewRelicLicense}" ]; then
-                bash /root/${!GITREPO%.*}/scripts/bootstrap/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+                bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
               fi
 
               ##########################################################
@@ -894,7 +911,7 @@ Resources:
               ##########################################################
 
               if [ -n "${SumologicAccessID}" ]; then
-                bash /root/${!GITREPO%.*}/scripts/bootstrap/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
+                bash /root/${!GITREPO%.*}/scripts/bash/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
               fi
 
               ##########################################################
@@ -964,6 +981,8 @@ Resources:
             export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             export STACKNAME='${AWS::StackName}'
             export HOSTNAME="${JenkinsSubdomain}-build-${!INSTANCE_ID}.${HostedZone}"
+            export GITCLONE='${GitClone}'
+            export GITREPO="${!GITCLONE##*/}"
             export GHCREDS='${GithubCreds}'
 
             ##########################################################
@@ -1088,7 +1107,7 @@ Resources:
             ##########################################################
 
             if [ -n "${NewRelicLicense}" ]; then
-              wget -qO /root/newrelic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/newrelic.sh' && bash /root/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+              bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
             fi
 
             ##########################################################
@@ -1096,7 +1115,7 @@ Resources:
             ##########################################################
 
             if [ -n "${SumologicAccessID}" ]; then
-              wget -qO /root/sumologic.sh 'https://github.com/HearstAT/cfn_jenkins/raw/${GitBranch}/sumologic.sh' && bash /root/sumologic.sh proxy ${SumologicAccessID} ${SumologicAccessKey}
+              bash /root/${!GITREPO%.*}/scripts/bash/sumologic.sh master ${SumologicAccessID} ${SumologicAccessKey}
             fi
 
             ##########################################################
