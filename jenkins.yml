@@ -1050,7 +1050,7 @@ Resources:
             systemctl daemon-reload || error_exit "Failed to reload Docker Daemon Changes"
             systemctl restart docker || error_exit "Failed to restart Docker Daemon"
 
-            cat > '/root/.bashrc' << EOF
+            cat >> '/root/.bashrc' << 'EOF'
             dcleanup(){
               docker rm $(docker ps -aq 2>/dev/null) 2>/dev/null
               docker rm -v $(docker ps --filter status=exited -q 2>/dev/null) 2>/dev/null
