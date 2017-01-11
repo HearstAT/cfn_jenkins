@@ -798,8 +798,8 @@ Resources:
                 ADMINCREDS='${GithubCreds}'
               fi
 
-              crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
+              crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/bootstrap/groovy/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
               ## Pull In Backup Data
               if [ -n ${ExistingBucketName} ] && [ ${RestoreBackup} == 'true' ]; then
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
@@ -821,8 +821,8 @@ Resources:
               done
 
               if [ ! -f /var/lib/jenkins/github_bootstrap ]; then
-                crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
-                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
+                crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
+                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
                 touch /var/lib/jenkins/github_bootstrap
                 systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins (Github Auth)"
                 ADMINCREDS='${GithubCreds}'
@@ -833,12 +833,10 @@ Resources:
                 sleep 5
               done
 
-              crumb=`curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)"`
+              crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
 
               for script in $(ls /root/${!GITREPO%.*}/scripts/groovy/); do
-                if [ "${!script}" != 'github_auth.groovy' ] || [ "${!script}" != 'plugins.groovy' ]; then
-                  curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/${!script})" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Script; $!{script}"
-                fi
+                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/groovy/${!script})" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Script; $!{script}"
               done
 
               systemctl stop jenkins || error_exit "Failed to stop Jenkins"
@@ -882,12 +880,16 @@ Resources:
               # Run JJB Seed
               ##########################################################
 
-              until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
-                printf '.'
-                sleep 5
-              done
+              if [ -n "${JJBRepo}" ]; then
+                until $(curl --output /dev/null --silent --head --fail 127.0.0.1:8080/login); do
+                  printf '.'
+                  sleep 5
+                done
 
-              curl -X POST https://${JenkinsSubdomain}.${HostedZone}/job/jjb-sync/build?token=${!JJBTOKEN}
+                crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
+
+                curl -H $crumb --user "${!ADMINCREDS}" -X POST "127.0.0.1:8080/job/jjb-sync/build?token=${!JJBTOKEN}" || error_exit "Failed to run JJB Sync Job"
+              fi
 
               ##########################################################
               # NewRelic Config if Enabled
@@ -1069,6 +1071,7 @@ Resources:
 
             docker pull hearstat/jenkins-build-base:debian || error_exit "Failed to pull Base Image: Debian"
             docker pull hearstat/jenkins-build-base:alpine || error_exit "Failed to pull Base Image: Alpine"
+            docker pull hearstat/jenkins-build-base || error_exit "Failed to pull Base Image: Alpine"
             docker pull hearstat/jenkins-build-foodcritic || error_exit "Failed to pull Image: Foodcritic"
             docker pull hearstat/jenkins-build-jjb || error_exit "Failed to pull Image: Jenkins Job Builder"
 
