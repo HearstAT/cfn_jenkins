@@ -759,10 +759,10 @@ Resources:
 
               ## Swap Placeholders with Params
               ### Github Oauth Config Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/groovy/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               ### Github Server Config (Pending)
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/groovy/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
@@ -799,7 +799,7 @@ Resources:
               fi
 
               crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
-              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/bootstrap/groovy/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
+              curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/plugins.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Plugins Install"
               ## Pull In Backup Data
               if [ -n ${ExistingBucketName} ] && [ ${RestoreBackup} == 'true' ]; then
                 aws s3 sync s3://${ExistingBucketName}/jenkins /var/lib/jenkins || error_exit "Jenkins Sync: Failed to sync existing data"
