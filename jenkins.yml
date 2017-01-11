@@ -759,10 +759,10 @@ Resources:
 
               ## Swap Placeholders with Params
               ### Github Oauth Config Script
-              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
-              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientID/${GithubClientID}/g' /root/${!GITREPO%.*}/scripts/bootstrap/githubAuth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceClientSecret/${GithubClientSecret}/g' /root/${!GITREPO%.*}/scripts/bootstrap/githubAuth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubOrg/${GithubOrg}/g' /root/${!GITREPO%.*}/scripts/bootstrap/githubAuth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
+              sed -i 's/replaceGithubAdmins/${GithubAdmins}/g' /root/${!GITREPO%.*}/scripts/bootstrap/githubAuth.groovy || error_exit "Groovy Bootstrap: Failed to replace Github Oath Params"
               ### Github Server Config (Pending)
               ### Credentials Config Script
               sed -i 's/replaceSlackToken/${SlackToken}/g' /root/${!GITREPO%.*}/scripts/groovy/credentials.groovy || error_exit "Groovy Bootstrap: Failed to replace Slack Credential Params"
@@ -822,7 +822,7 @@ Resources:
 
               if [ ! -f /var/lib/jenkins/github_bootstrap ]; then
                 crumb=$(curl --user "${!ADMINCREDS}" "127.0.0.1:8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
-                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/github_auth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
+                curl -H $crumb --user "${!ADMINCREDS}" --data-urlencode "script=$(</root/${!GITREPO%.*}/scripts/bootstrap/githubAuth.groovy)" 127.0.0.1:8080/scriptText || error_exit "Jenkins Bootstrap: Failed to run Groovy Github Oauth Config"
                 touch /var/lib/jenkins/github_bootstrap
                 systemctl restart jenkins || error_exit "Jenkins Bootstrap: Failed to restart Jenkins (Github Auth)"
                 ADMINCREDS='${GithubCreds}'
@@ -1018,6 +1018,7 @@ Resources:
             apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main' || error_exit "Failed to add Repo List"
 
             apt-get update && apt-get install -y docker-engine=${DockerVersion}-0* || error_exit "Failed to Install Docker Engine"
+            apt-mark hold docker-engine || error_exit "Failed to set hold on Docker Engine"
 
             ##########################################################
             # Docker Setup
@@ -1137,7 +1138,6 @@ Resources:
             # Reboot After Success for all updates made
             ##########################################################
 
-            apt-get update && apt-get -y upgrade
             reboot
 
       Tags:
