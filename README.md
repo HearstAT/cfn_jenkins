@@ -37,8 +37,7 @@ Our Jenkins Configuration
     -   MasterInstanceType; Select Instance Size for Jenkins Master (only has a single executor for small backup  jobs)
     -   JenkinsSubdomain; Choose subdomain to create in
     -   JenkinsVersion; Select which version of Jenkins you want to install (>= 2.x Only Available)
-    -   JenkinsLogLevel; Select which log level you want Jenkins to log at
-    -   JJBRepo; Enter url for Jenkins Job Builder Templates to Seed/Sync to Jenkins. (See [Jenkins Job Builer](#jenkins-job-builder) Section for more info)
+    -   JJBRepo; Enter url for Jenkins Job Builder Templates to Seed/Sync to Jenkins. (See [Jenkins Job Builder](#jenkins-job-builder) Section for more info)
 -   Github Configuration (See [Github Section](#github) for more Info)
     -   GithubAdmins; [Github Oauth](https://wiki.jenkins-ci.org/display/JENKINS/GitHub+OAuth+Plugin): Enter a comma delimited list of Github Usernames to act as Jenkins Admins (i.e.; octobob, turkeydaniels, catarang)
     -   GithubCreds; Enter you Github Username and [Personal Access Token](https://github.com/settings/tokens) in this format `ghuser:token`
@@ -134,6 +133,9 @@ Create Multiple Jobs that require the same build Process
     node: master
     build-discarder:
       numToKeep: 10
+    wrappers:
+      - ansicolor:
+          colormap: xterm
     triggers:
       - github
     scm:
@@ -147,29 +149,79 @@ Create Multiple Jobs that require the same build Process
           timeout: 5
     publishers:
       - s3:
-        s3-profile: '{s3-profile}'
-        entries:
-          - destination-bucket: {bucket}
-            source-files: '**/*'
-            storage-class: STANDARD
-            bucket-region: {region}
-            upload-on-failure: true
-            upload-from-slave: false
-            managed-artifacts: false
-            s3-encryption: false
-            flatten: false
+          s3-profile: '{s3-profile}'
+          entries:
+            - destination-bucket: '{bucket}'
+              source-files: '**/*'
+              storage-class: STANDARD
+              bucket-region: '{region}'
+              upload-on-failure: true
+              upload-from-slave: false
+              managed-artifacts: false
+              s3-encryption: false
+              flatten: false
 ```
 
-#### Example view
-Create a view that only shows the above create websites
+#### Backup to S3 Job
+JJB Template that updates daily to the Jenkins S3 sync bucket if there are any changes
 
 ```yaml
 ---
-- view:
-    name: Websites
-    view-type: list
-    regex: 'Website-*'
+- job:
+    name: 'jenkins-backup'
+    display-name: 'Jenkins Backup'
+    description: 'Jenkins Backup Job Trigger by Config.xml updates - '
+    project-type: freestyle
+    defaults: global
+    disabled: false
+    concurrent: false
+    quiet-period: 5
+    block-downstream: false
+    block-upstream: false
+    retry-count: 3
+    node: 'master'
+    build-discarder:
+      numToKeep: 10
+    wrappers:
+      - ansicolor:
+          colormap: xterm
+      - inject:
+          properties-file: '/var/lib/jenkins/variables'
+    triggers:
+      - monitor-folders:
+          path: '/var/lib/jenkins'
+          includes:
+            - 'config.xml'
+            - 'hudson*.xml'
+            - 'jenkins*.xml'
+            - 'credentials.xml'
+          excludes: '(*jobs/*|*war/*|*workspace/*)'
+          check-modification-date: true
+          check-content: false
+          check-fewer: true
+          cron: H 5 * * *
+    builders:
+      - shell: |
+          aws s3 sync /var/lib/jenkins/ s3://${JENKINS_BUCKET}/jenkins \
+          --exclude "*" \
+          --exclude "*/*" \
+          --include "github_bootstrap" \
+          --include "hudson.*.xml" \
+          --include "jenkins*.xml" \
+          --include "config.xml" \
+          --include "credentials.xml" \
+          --include "*.key" \
+          --include "*secrets/*"
 ```
+
+### Properties File
+
+During Build there is a properties (variables) created that can be used to inject some addition info into builds
+
+-   File: `/var/lib/jenkins/variables`
+    -   `JENKINS_BUCKET` (Jenkins Sync Bucket, Existing or Created depend on params)
+    -   `STACKNAME` (CFN Stack Name)
+    -   `MASTER_INSTANCE_ID` (Instance ID of Master)
 
 ### Plugins
 

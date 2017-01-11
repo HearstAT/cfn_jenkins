@@ -100,6 +100,17 @@ cat > '/opt/SumoCollector/sources.json' << EOF
       "timeZone": "UTC",
       "category": "Jenkins/Master",
       "pathExpression": "/var/log/jenkins/*.log"
+    },
+    {
+      "name": "Jenkins Support Logs",
+      "sourceType": "LocalFile",
+      "automaticDateParsing": true,
+      "multilineProcessingEnabled": false,
+      "useAutolineMatching": true,
+      "forceTimeZone": false,
+      "timeZone": "UTC",
+      "category": "Jenkins/Master",
+      "pathExpression": "/var/lib/jenkins/support/*.log"
     }
   ]
 }
