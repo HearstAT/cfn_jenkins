@@ -240,11 +240,6 @@ Parameters:
 ###############################################################################
 # New Relic Configuration
 ###############################################################################
-  NewRelicAppName:
-    Type: String
-    Default: ''
-    Description: (Optional) Enter New Relic Application Name; e.g.; jenkins_stack
-
   NewRelicLicense:
     Type: String
     NoEcho: 'true'
@@ -342,7 +337,6 @@ Metadata:
       Label:
         default: New Relic Configuration
       Parameters:
-        - NewRelicAppName
         - NewRelicLicense
     -
       Label:
@@ -898,7 +892,7 @@ Resources:
               ##########################################################
 
               if [ -n "${NewRelicLicense}" ]; then
-                bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+                bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${!STACKNAME}
               fi
 
               ##########################################################
@@ -1118,7 +1112,7 @@ Resources:
             ##########################################################
 
             if [ -n "${NewRelicLicense}" ]; then
-              bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${NewRelicAppName}
+              bash /root/${!GITREPO%.*}/scripts/bash/newrelic.sh ${NewRelicLicense} ${!STACKNAME}
             fi
 
             ##########################################################

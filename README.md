@@ -70,7 +70,6 @@ Our Jenkins Configuration
     -   SumologicAccessID; See [Sumologic](#sumologic) for more info
     -   SumologicAccessKey; See [Sumologic](#sumologic) for more info
 -   NewRelic Configuration (Optional)
-    -   NewRelicAppName; See [NewRelic](#new-relic) for more info
     -   NewRelicLicense; See [NewRelic](#new-relic) for more info
 -   Development Options
     -   GitClone; See [Development/Forked/Custom Selections](#developmentforkedcustom-selections) for more info
@@ -265,6 +264,8 @@ We utilize New Relic as our System Monitor, this is setup only if conditions are
 **If New Relic License Key Param is Filled Out**
 
 Installed via [newrelic.sh](scripts/bootstrap/newrelic.sh)
+
+CFN Stack Name is used for App Name
 
 -   What is Enabled:
     -   New Relic [System Monitor](https://docs.newrelic.com/docs/servers/new-relic-servers-linux/getting-started/new-relic-servers-linux)
