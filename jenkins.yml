@@ -849,16 +849,11 @@ Resources:
               ${JenkinsVersion}
               EOF
 
-              aws s3 sync /var/lib/jenkins/ s3://${BUCKET}/jenkins \
-              --exclude "*" \
-              --exclude "*/*" \
-              --include "github_bootstrap" \
-              --include "hudson.*.xml" \
-              --include "jenkins*.xml" \
-              --include "config.xml" \
-              --include "credentials.xml" \
-              --include "*.key" \
-              --include "*secrets/*"
+              for xml in $(ls /var/lib/jenkins/*.xml); do
+                aws s3 cp $xml s3://${BUCKET}/jenkins
+              done
+
+              aws s3 cp /var/lib/jenkins/secrets s3://${BUCKET}/jenkins --recursive
 
               cp -f /root/${!GITREPO%.*}/scripts/xml/* /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy XML files in place"
               cp -rf /root/${!GITREPO%.*}/scripts/jobs /var/lib/jenkins/ || error_exit "Jenkins Bootstrap: Failed to Copy JJB Seed/Sync job"

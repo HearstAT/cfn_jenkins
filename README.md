@@ -188,30 +188,14 @@ JJB Template that updates daily to the Jenkins S3 sync bucket if there are any c
       - inject:
           properties-file: '/var/lib/jenkins/variables'
     triggers:
-      - monitor-folders:
-          path: '/var/lib/jenkins'
-          includes:
-            - 'config.xml'
-            - 'hudson*.xml'
-            - 'jenkins*.xml'
-            - 'credentials.xml'
-          excludes: '(*jobs/*|*war/*|*workspace/*)'
-          check-modification-date: true
-          check-content: false
-          check-fewer: true
-          cron: H 5 * * *
+      - timed: "@midnight"
     builders:
       - shell: |
-          aws s3 sync /var/lib/jenkins/ s3://${JENKINS_BUCKET}/jenkins \
-          --exclude "*" \
-          --exclude "*/*" \
-          --include "github_bootstrap" \
-          --include "hudson.*.xml" \
-          --include "jenkins*.xml" \
-          --include "config.xml" \
-          --include "credentials.xml" \
-          --include "*.key" \
-          --include "*secrets/*"
+          for xml in $(ls ${JENKINS_HOME}/*.xml); do
+            aws s3 cp $xml s3://${JENKINS_BUCKET}/jenkins
+          done
+
+          aws s3 cp ${JENKINS_HOME}/secrets s3://${JENKINS_BUCKET}/jenkins --recursive
 ```
 
 ### Properties File
@@ -304,6 +288,9 @@ This setup pulls the following docker images, if you wish to expand on them plea
 -   Base Build Image
     -   [Dockerhub](https://hub.docker.com/r/hearstat/jenkins-build-base/)
     -   [Github](https://github.com/HearstAT/docker-jenkins-build-base)
+-   Jenkins Job Builder Image
+    -   [Dockerhub](https://hub.docker.com/r/hearstat/jenkins-build-jjb/)
+    -   [Github](https://github.com/HearstAT/docker-jenkins-build-jjb)
 -   Foodcritic (Chef Cookbook) Image
     -   [Dockerhub](https://hub.docker.com/r/hearstat/jenkins-build-foodcritic/)
     -   [Github](https://github.com/HearstAT/docker-jenkins-build-foodcritic)
