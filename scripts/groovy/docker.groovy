@@ -124,7 +124,7 @@ docker_settings =
                 labelString: 'jjb',
                 remoteFs: '/var/lib/jenkins',
                 remoteFsMapping: '',
-                instanceCapStr: '1',
+                instanceCapStr: '2',
                 // SSH Launcher
                 credentialsId: 'jenkins-docker-server'
             ]
@@ -168,7 +168,7 @@ docker_settings.each { cloud ->
         )
 
       def dockerComputerSSHLauncher = new DockerComputerSSHLauncher(
-          new SSHConnector(22, template.credentialsId, null, null, null, null, 5, 2, 5 )
+          new SSHConnector(22, template.credentialsId, null, null, null, null, 20, 2, 5 )
       )
 
       dockerTemplate.setLauncher(dockerComputerSSHLauncher)

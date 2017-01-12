@@ -710,11 +710,11 @@ Resources:
               Type=simple
               User=jenkins
               Group=jenkins
-              Environment=JENKINS_HOME=/var/lib/jenkins
-              Environment=JENKINS_WAR=/usr/share/jenkins/jenkins.war
-              Environment=JENKINS_LOGFILE=/var/log/jenkins/jenkins.log
-              Environment=JENKINS_PORT=8080
-              ExecStart=/usr/bin/java -Djava.awt.headless=true -jar $JENKINS_WAR -DJENKINS_HOME=$JENKINS_HOME --httpPort=$JENKINS_PORT --httpListenAddress=0.0.0.0 --logfile=$JENKINS_LOGFILE
+              ExecStart=/usr/bin/java -Djava.awt.headless=true \
+                        -DJENKINS_HOME=/var/lib/jenkins \
+                        -jar /usr/share/jenkins/jenkins.war \
+                        --httpPort=8080 \
+                        --httpListenAddress=0.0.0.0
               ExecReload=/bin/kill -s HUP $MAINPID
               TimeoutStartSec=0
               Restart=always
@@ -888,7 +888,7 @@ Resources:
                done
 
                # Wait for JJB Seed Job to Finish
-               until [ $(grep 'Finished: SUCCESS' /var/lib/jenkins/jobs/jjb-sync/builds/1/log) == 'Finished: SUCCESS' ]; do
+               until [ "$(grep 'Finished: SUCCESS' /var/lib/jenkins/jobs/jjb-sync/builds/1/log)" == 'Finished: SUCCESS' ]; do
                 sleep 5
                done
               fi
