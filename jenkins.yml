@@ -856,9 +856,9 @@ Resources:
               chown -R jenkins:jenkins /var/lib/jenkins || error_exit "Jenkins Bootstrap: Failed to change Jenkins directory owner"
 
               cat > '/var/lib/jenkins/variables' << EOF
-              JENKINS_BUCKET='${BUCKET}'
-              STACKNAME="${!STACKNAME}"
-              MASTER_INSTANCE_ID="${!INSTANCE_ID}"
+              JENKINS_BUCKET=${BUCKET}
+              STACKNAME=${!STACKNAME}
+              MASTER_INSTANCE_ID=${!INSTANCE_ID}
               EOF
 
               systemctl start jenkins || error_exit "Jenkins Bootstrap: Failed to start Jenkins"
