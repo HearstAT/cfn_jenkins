@@ -28,6 +28,8 @@ def activatePlugin(plugin) {
   "git",
   "github-oauth",
   "greenballs",
+  "checkstyle",
+  "htmlpublisher",
   "workflow-aggregator",
   "support-core",
   "run-condition",
